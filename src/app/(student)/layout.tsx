@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { getMe } from "@/lib/api/auth";
-import { ApiError } from "@/lib/api/client";
+import { getSession } from "@/lib/auth/session";
 import { StudentNav } from "@/components/nav/StudentNav";
 
 export default async function StudentLayout({
@@ -10,13 +9,8 @@ export default async function StudentLayout({
 }: {
   children: React.ReactNode;
 }) {
-  try {
-    const user = await getMe();
-    if (user.role !== "student") redirect("/");
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 401) redirect("/");
-    throw e;
-  }
+  const session = await getSession();
+  if (!session.isLoggedIn || session.role !== "student") redirect("/");
 
   return (
     <div className="min-h-screen flex flex-col">

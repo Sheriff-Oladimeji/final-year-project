@@ -1,36 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { adminLogin } from "@/lib/api/auth";
-import { ApiError } from "@/lib/api/client";
+import { adminLoginAction } from "@/actions/auth";
 
 export function AdminLoginForm() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await adminLogin(email, password);
-      router.push("/admin/users");
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setError("Invalid email or password.");
-      } else if (err instanceof ApiError && err.status === 429) {
-        setError("Too many attempts. Try again in a minute.");
-      } else {
-        setError("Something went wrong. Please try again.");
+      const formData = new FormData(e.currentTarget);
+      const result = await adminLoginAction(formData);
+      // adminLoginAction redirects on success — if we get here, it errored
+      if (result && "error" in result) {
+        setError(result.error);
       }
+    } catch {
+      // redirect() throws internally in Next.js — that's normal
     } finally {
       setLoading(false);
     }
@@ -47,9 +40,8 @@ export function AdminLoginForm() {
         <Label htmlFor="email">Email</Label>
         <Input
           id="email"
+          name="email"
           type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
           placeholder="admin@example.com"
@@ -59,9 +51,8 @@ export function AdminLoginForm() {
         <Label htmlFor="password">Password</Label>
         <Input
           id="password"
+          name="password"
           type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="current-password"
         />

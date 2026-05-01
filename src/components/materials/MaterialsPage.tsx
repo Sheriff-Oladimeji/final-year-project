@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { FileText, Video, Trash2, Loader2, CheckCircle, XCircle, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,49 +18,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  listMaterials,
-  uploadPdf,
-  submitYoutube,
-  deleteMaterial,
-} from "@/lib/api/materials";
-import { ApiError } from "@/lib/api/client";
+import { uploadPdfAction, submitYoutubeAction, deleteMaterialAction } from "@/actions/materials";
 import type { Material } from "@/types";
 
-export function MaterialsPage() {
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [loadingInitial, setLoadingInitial] = useState(true);
+interface MaterialsPageProps {
+  initialMaterials: Material[];
+}
+
+export function MaterialsPage({ initialMaterials }: MaterialsPageProps) {
+  const router = useRouter();
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [youtubeUrl, setVideoUrl] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [submittingVideo, setSubmittingVideo] = useState(false);
-  const [youtubeError, setVideoError] = useState<string | null>(null);
+  const [youtubeError, setYoutubeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // IDs of materials that are still pending — we poll until they settle
-  const pendingIds = materials.filter((m) => m.status === "pending").map((m) => m.id);
-
-  async function fetchMaterials() {
-    try {
-      const data = await listMaterials();
-      setMaterials(data);
-    } catch {
-      // Silently fail on background refresh
-    }
-  }
-
-  useEffect(() => {
-    listMaterials()
-      .then(setMaterials)
-      .finally(() => setLoadingInitial(false));
-  }, []);
-
-  // Poll every 3s while any material is pending
-  useEffect(() => {
-    if (pendingIds.length === 0) return;
-    const id = setInterval(fetchMaterials, 3000);
-    return () => clearInterval(id);
-  }, [pendingIds.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -67,10 +40,16 @@ export function MaterialsPage() {
     setPdfError(null);
     setUploadingPdf(true);
     try {
-      const material = await uploadPdf(file);
-      setMaterials((prev) => [material, ...prev]);
-    } catch (err) {
-      setPdfError(err instanceof Error ? err.message : "Upload failed.");
+      const formData = new FormData();
+      formData.append("file", file);
+      const result = await uploadPdfAction(formData);
+      if ("error" in result) {
+        setPdfError(result.error ?? "Upload failed.");
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setPdfError("Upload failed. Please try again.");
     } finally {
       setUploadingPdf(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -79,38 +58,30 @@ export function MaterialsPage() {
 
   async function handleVideoSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setVideoError(null);
+    setYoutubeError(null);
     setSubmittingVideo(true);
     try {
-      const material = await submitYoutube(youtubeUrl);
-      setMaterials((prev) => [material, ...prev]);
-      setVideoUrl("");
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 422) {
-        setVideoError("Could not extract transcript. Make sure the video has captions enabled.");
+      const formData = new FormData();
+      formData.append("url", youtubeUrl);
+      const result = await submitYoutubeAction(formData);
+      if ("error" in result) {
+        setYoutubeError(result.error ?? "Failed to add video.");
       } else {
-        setVideoError("Failed to add video. Check the URL and try again.");
+        setYoutubeUrl("");
+        router.refresh();
       }
+    } catch {
+      setYoutubeError("Failed to add video. Check the URL and try again.");
     } finally {
       setSubmittingVideo(false);
     }
   }
 
   async function handleDelete(id: string) {
-    try {
-      await deleteMaterial(id);
-      setMaterials((prev) => prev.filter((m) => m.id !== id));
-    } catch {
-      // Could show a toast here
+    const result = await deleteMaterialAction(id);
+    if (!("error" in result)) {
+      router.refresh();
     }
-  }
-
-  if (loadingInitial) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
   }
 
   return (
@@ -187,7 +158,7 @@ export function MaterialsPage() {
             <form onSubmit={handleVideoSubmit} className="flex gap-2">
               <Input
                 value={youtubeUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
                 placeholder="https://youtube.com/watch?v=..."
                 required
                 disabled={submittingVideo}
@@ -202,7 +173,7 @@ export function MaterialsPage() {
       </div>
 
       {/* Materials list */}
-      {materials.length === 0 ? (
+      {initialMaterials.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-16 text-center">
           <p className="text-sm font-medium">No materials yet</p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -215,7 +186,7 @@ export function MaterialsPage() {
             Your materials
           </Label>
           <div className="divide-y divide-border rounded-xl border border-border">
-            {materials.map((m) => (
+            {initialMaterials.map((m) => (
               <MaterialRow key={m.id} material={m} onDelete={handleDelete} />
             ))}
           </div>

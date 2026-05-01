@@ -14,8 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ask, reply } from "@/lib/api/chat";
-import { ApiError } from "@/lib/api/client";
+import { askAction, replyAction } from "@/actions/chat";
 import type { Citation, Correctness } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -41,10 +40,7 @@ type Turn = QuestionTurn | ReplyTurn;
 
 // ── Correctness display ─────────────────────────────────────────────────────
 
-const CORRECTNESS_STYLES: Record<
-  Correctness,
-  { label: string; className: string }
-> = {
+const CORRECTNESS_STYLES: Record<Correctness, { label: string; className: string }> = {
   correct: {
     label: "Correct",
     className: "bg-green-100 text-green-700 border-green-200",
@@ -72,19 +68,13 @@ function CitationsAccordion({ citations }: { citations: Citation[] }) {
       >
         <BookOpen className="size-3" />
         {citations.length} source{citations.length > 1 ? "s" : ""}
-        {open ? (
-          <ChevronUp className="size-3" />
-        ) : (
-          <ChevronDown className="size-3" />
-        )}
+        {open ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
       </button>
       {open && (
         <div className="mt-2 space-y-2">
           {citations.map((c, i) => (
             <div key={i} className="rounded-lg bg-muted/50 p-3 text-xs">
-              <p className="font-medium text-muted-foreground mb-1">
-                {c.source}
-              </p>
+              <p className="font-medium text-muted-foreground mb-1">{c.source}</p>
               <p className="text-foreground leading-relaxed">{c.excerpt}</p>
             </div>
           ))}
@@ -135,16 +125,13 @@ function ReplyBubble({ turn }: { turn: ReplyTurn }) {
 
 export function ChatThread() {
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [currentInteractionId, setCurrentInteractionId] = useState<
-    string | null
-  >(null);
+  const [currentInteractionId, setCurrentInteractionId] = useState<string | null>(null);
   const [phase, setPhase] = useState<"ask" | "reply">("ask");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom whenever turns change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns]);
@@ -159,7 +146,13 @@ export function ChatThread() {
 
     try {
       if (phase === "ask") {
-        const res = await ask(text);
+        const result = await askAction(text);
+        if ("error" in result) {
+          const msg = result.error ?? "Something went wrong.";
+          setError(msg.includes("no indexed materials") ? "no_materials" : msg);
+          return;
+        }
+        const res = result.data;
         setTurns((prev) => [
           ...prev,
           {
@@ -173,7 +166,13 @@ export function ChatThread() {
         setCurrentInteractionId(res.interaction_id);
         setPhase("reply");
       } else {
-        const res = await reply(currentInteractionId!, text);
+        const result = await replyAction(currentInteractionId!, text);
+        if ("error" in result) {
+          setError(result.error ?? "Something went wrong.");
+          return;
+        }
+        const res = result.data;
+        const prevTopic = turns.findLast((t) => t.type === "question") as QuestionTurn | undefined;
         setTurns((prev) => [
           ...prev,
           {
@@ -183,28 +182,18 @@ export function ChatThread() {
             scoreDelta: res.score_delta,
             newScore: res.new_score,
           },
-          // Immediately push the next guided question
           {
             type: "question",
             content: res.next_guided_question,
-            topic: turns.findLast((t) => t.type === "question")
-              ? (turns.findLast((t) => t.type === "question") as QuestionTurn)
-                  .topic
-              : "",
+            topic: prevTopic?.topic ?? "",
             citations: [],
             interactionId: res.next_interaction_id,
           },
         ]);
         setCurrentInteractionId(res.next_interaction_id);
       }
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 422) {
-        setError("no_materials");
-      } else if (err instanceof ApiError && err.status === 429) {
-        setError("You're sending questions too fast. Wait a moment and try again.");
-      } else {
-        setError("Something went wrong. Please try again.");
-      }
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -230,9 +219,7 @@ export function ChatThread() {
           <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-muted-foreground">
             <MessageSquare className="size-8 opacity-40" />
             <div>
-              <p className="text-sm font-medium text-foreground">
-                Start learning
-              </p>
+              <p className="text-sm font-medium text-foreground">Start learning</p>
               <p className="text-xs mt-0.5">
                 Ask a question about your uploaded course materials.
               </p>
@@ -290,11 +277,7 @@ export function ChatThread() {
           rows={2}
           className="resize-none flex-1 text-sm"
         />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={loading || !input.trim()}
-        >
+        <Button type="submit" size="icon" disabled={loading || !input.trim()}>
           {loading ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (

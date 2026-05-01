@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { listUsers } from "@/lib/api/admin";
+import { listAllUsers } from "@/db/queries/users";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -11,9 +11,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { UserActions } from "@/components/admin/UserActions";
+import type { UserAdmin } from "@/types";
 
 export default async function AdminUsersPage() {
-  const users = await listUsers();
+  const rawUsers = await listAllUsers();
+
+  const users: UserAdmin[] = rawUsers.map((u) => ({
+    id: u.id,
+    email: u.email,
+    role: u.role as UserAdmin["role"],
+    created_at: u.createdAt.toISOString(),
+    disabled_at: u.disabledAt?.toISOString() ?? null,
+  }));
 
   return (
     <div className="space-y-6">

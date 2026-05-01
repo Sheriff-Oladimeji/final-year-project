@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
-import { listInteractions } from "@/lib/api/admin";
+import { listInteractionsAdmin } from "@/db/queries/interactions";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -31,20 +31,28 @@ interface PageProps {
 }
 
 export default async function AdminInteractionsPage({ searchParams }: PageProps) {
-  // Next.js 16: searchParams is a Promise
   const params = await searchParams;
 
-  const interactions = await listInteractions({
-    from_dt: params.from_dt,
-    to_dt: params.to_dt,
+  const rawInteractions = await listInteractionsAdmin({
+    fromDate: params.from_dt ? new Date(params.from_dt) : undefined,
+    toDate: params.to_dt ? new Date(params.to_dt) : undefined,
   });
 
-  // Client-side filtering for correctness/template (backend doesn't filter these yet)
-  const filtered = interactions.filter((i) => {
-    if (params.correctness && i.correctness !== params.correctness) return false;
-    if (params.template && i.prompt_template !== params.template) return false;
-    return true;
-  });
+  const interactions = rawInteractions
+    .filter((i) => {
+      if (params.correctness && i.correctness !== params.correctness) return false;
+      if (params.template && i.promptTemplate !== params.template) return false;
+      return true;
+    })
+    .map((i) => ({
+      id: i.id,
+      question: i.question,
+      student_reply: i.studentReply,
+      correctness: i.correctness,
+      score_delta: i.scoreDelta,
+      prompt_template: i.promptTemplate,
+      created_at: i.createdAt.toISOString(),
+    }));
 
   return (
     <div className="space-y-6">
@@ -55,12 +63,11 @@ export default async function AdminInteractionsPage({ searchParams }: PageProps)
         </p>
       </div>
 
-      {/* Filters must be wrapped in Suspense because useSearchParams is async */}
       <Suspense>
         <InteractionFilters />
       </Suspense>
 
-      {filtered.length === 0 ? (
+      {interactions.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-16 text-center">
           <p className="text-sm text-muted-foreground">No interactions match the current filters.</p>
         </div>
@@ -78,7 +85,7 @@ export default async function AdminInteractionsPage({ searchParams }: PageProps)
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((i) => (
+              {interactions.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="max-w-xs text-sm">
                     <p className="truncate" title={i.question}>{i.question}</p>

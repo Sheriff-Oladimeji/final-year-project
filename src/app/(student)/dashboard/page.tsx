@@ -1,13 +1,28 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { MessageSquare } from "lucide-react";
-import { getTopics } from "@/lib/api/dashboard";
+import { getSession } from "@/lib/auth/session";
+import { listTopicsWithHistory } from "@/db/queries/topics";
 import { TopicCard } from "@/components/dashboard/TopicCard";
 import { Button } from "@/components/ui/button";
+import type { Topic } from "@/types";
 
 export default async function DashboardPage() {
-  const topics = await getTopics();
+  const session = await getSession();
+  if (!session.isLoggedIn) redirect("/");
+
+  const rawTopics = await listTopicsWithHistory(session.userId);
+
+  const topics: Topic[] = rawTopics.map((t) => ({
+    id: t.id,
+    name: t.name,
+    mastery_score: t.masteryScore,
+    updated_at: t.updatedAt.toISOString(),
+    tier: t.tier,
+    recent_history: t.recentHistory,
+  }));
 
   return (
     <div className="space-y-6">

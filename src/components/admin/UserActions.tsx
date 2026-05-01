@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { disableUser, deleteUser } from "@/lib/api/admin";
+import { disableUserAction, deleteUserAction } from "@/actions/admin";
 import type { UserAdmin } from "@/types";
 
 interface UserActionsProps {
@@ -29,7 +29,7 @@ export function UserActions({ user }: UserActionsProps) {
   async function handleDisable() {
     setDisabling(true);
     try {
-      await disableUser(user.id);
+      await disableUserAction(user.id);
       router.refresh();
     } finally {
       setDisabling(false);
@@ -39,7 +39,7 @@ export function UserActions({ user }: UserActionsProps) {
   async function handleDelete() {
     setDeleting(true);
     try {
-      await deleteUser(user.id);
+      await deleteUserAction(user.id);
       router.refresh();
       setDeleteOpen(false);
     } finally {

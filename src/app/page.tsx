@@ -1,22 +1,16 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { getMe } from "@/lib/api/auth";
-import { ApiError } from "@/lib/api/client";
-import { API_BASE } from "@/lib/config";
+import { getSession } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { AdminLoginForm } from "@/components/auth/AdminLoginForm";
 
 export default async function LandingPage() {
-  // Redirect already-signed-in users to their home
-  try {
-    const user = await getMe();
-    if (user.role === "admin") redirect("/admin/users");
-    if (user.role === "student") redirect("/dashboard");
-  } catch (e) {
-    if (!(e instanceof ApiError && e.status === 401)) throw e;
-    // Not signed in — fall through to render the login page
+  const session = await getSession();
+  if (session.isLoggedIn) {
+    if (session.role === "admin") redirect("/admin/users");
+    if (session.role === "student") redirect("/dashboard");
   }
 
   return (
@@ -40,7 +34,7 @@ export default async function LandingPage() {
           </div>
           {/* Full-page navigation — NOT a fetch call */}
           <Button asChild className="w-full">
-            <a href={`${API_BASE}/auth/google/start`}>
+            <a href="/api/auth/google/start">
               <svg className="size-4" viewBox="0 0 24 24" aria-hidden>
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
