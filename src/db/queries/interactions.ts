@@ -5,7 +5,7 @@ import type { Interaction } from "@/db/schema";
 
 export async function createInteraction(data: {
   userId: string;
-  sessionId: string;
+  sessionId?: string;
   topicId: string;
   question: string;
   retrievedContext: string;
@@ -19,11 +19,7 @@ export async function createInteraction(data: {
 export async function updateInteraction(
   id: string,
   userId: string,
-  data: {
-    studentReply: string;
-    correctness: string;
-    scoreDelta: number;
-  },
+  data: { studentReply: string; correctness: string; scoreDelta: number },
 ): Promise<Interaction> {
   const rows = await db
     .update(interactions)
@@ -76,9 +72,6 @@ export async function listInteractionsAdmin(params: {
     .limit(params.limit ?? 100)
     .offset(params.skip ?? 0);
 
-  if (conditions.length > 0) {
-    return query.where(and(...conditions));
-  }
-
+  if (conditions.length > 0) return query.where(and(...conditions));
   return query;
 }

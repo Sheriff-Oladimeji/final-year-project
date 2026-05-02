@@ -1,15 +1,16 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { getSession } from "@/lib/auth/session";
-import { createMaterial, deleteMaterial, setMaterialStatus } from "@/db/queries/materials";
+import { auth } from "@/lib/auth";
+import { createMaterial, deleteMaterial, setMaterialStatus, getMaterial } from "@/db/queries/materials";
 import { saveFile, deleteFile } from "@/lib/uploads";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadBytes, uploadFromPath, deleteGeminiFile } from "@/lib/gemini/files";
 
 async function requireStudent() {
-  const session = await getSession();
-  if (!session.isLoggedIn || session.role !== "student") {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || session.user.role !== "student" || session.user.disabledAt) {
     return { error: "Unauthorised" } as const;
   }
   return session;
@@ -25,7 +26,7 @@ export async function uploadPdfAction(formData: FormData) {
   }
 
   const material = await createMaterial({
-    userId: session.userId,
+    userId: session.user.id,
     kind: "pdf",
     displayName: file.name,
     sourceUri: file.name,
@@ -33,20 +34,15 @@ export async function uploadPdfAction(formData: FormData) {
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const localPath = await saveFile(session.userId, material.id, buffer);
+    const localPath = await saveFile(session.user.id, material.id, buffer);
     const fileSearchId = await uploadFromPath(localPath, "application/pdf", file.name);
 
-    await setMaterialStatus(material.id, "ready", {
-      fileSearchId,
-      indexedAt: new Date(),
-    });
-
+    await setMaterialStatus(material.id, "ready", { fileSearchId, indexedAt: new Date() });
     revalidatePath("/materials");
     return { data: { id: material.id, status: "ready" } };
   } catch (err: unknown) {
     await setMaterialStatus(material.id, "failed");
-    const msg = err instanceof Error ? err.message : "Upload failed.";
-    return { error: msg };
+    return { error: err instanceof Error ? err.message : "Upload failed." };
   }
 }
 
@@ -64,13 +60,12 @@ export async function submitYoutubeAction(formData: FormData) {
     videoId = result.videoId;
     transcriptText = result.text;
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch transcript.";
-    return { error: msg };
+    return { error: err instanceof Error ? err.message : "Failed to fetch transcript." };
   }
 
   const displayName = `YouTube: ${videoId}`;
   const material = await createMaterial({
-    userId: session.userId,
+    userId: session.user.id,
     kind: "youtube",
     displayName,
     sourceUri: url,
@@ -83,18 +78,12 @@ export async function submitYoutubeAction(formData: FormData) {
       "text/plain",
       displayName,
     );
-
-    await setMaterialStatus(material.id, "ready", {
-      fileSearchId,
-      indexedAt: new Date(),
-    });
-
+    await setMaterialStatus(material.id, "ready", { fileSearchId, indexedAt: new Date() });
     revalidatePath("/materials");
     return { data: { id: material.id, status: "ready" } };
   } catch (err: unknown) {
     await setMaterialStatus(material.id, "failed");
-    const msg = err instanceof Error ? err.message : "Upload failed.";
-    return { error: msg };
+    return { error: err instanceof Error ? err.message : "Upload failed." };
   }
 }
 
@@ -102,19 +91,13 @@ export async function deleteMaterialAction(materialId: string) {
   const session = await requireStudent();
   if ("error" in session) return session;
 
-  const { getMaterial } = await import("@/db/queries/materials");
-  const material = await getMaterial(materialId, session.userId);
+  const material = await getMaterial(materialId, session.user.id);
   if (!material) return { error: "Material not found." };
 
-  if (material.fileSearchId) {
-    await deleteGeminiFile(material.fileSearchId);
-  }
+  if (material.fileSearchId) await deleteGeminiFile(material.fileSearchId);
+  if (material.localPath) await deleteFile(material.localPath);
 
-  if (material.localPath) {
-    await deleteFile(material.localPath);
-  }
-
-  await deleteMaterial(materialId, session.userId);
+  await deleteMaterial(materialId, session.user.id);
   revalidatePath("/materials");
   return { data: { success: true } };
 }

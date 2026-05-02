@@ -1,12 +1,13 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { getSession } from "@/lib/auth/session";
+import { auth } from "@/lib/auth";
 import { disableUser, deleteUser } from "@/db/queries/users";
 
 async function requireAdmin() {
-  const session = await getSession();
-  if (!session.isLoggedIn || session.role !== "admin") {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || session.user.role !== "admin") {
     return { error: "Unauthorised" } as const;
   }
   return null;

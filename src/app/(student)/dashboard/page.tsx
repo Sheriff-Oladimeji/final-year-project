@@ -1,20 +1,20 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import Link from "next/link";
 import { MessageSquare } from "lucide-react";
-import { getSession } from "@/lib/auth/session";
+import { auth } from "@/lib/auth";
 import { listTopicsWithHistory } from "@/db/queries/topics";
 import { TopicCard } from "@/components/dashboard/TopicCard";
 import { Button } from "@/components/ui/button";
 import type { Topic } from "@/types";
 
 export default async function DashboardPage() {
-  const session = await getSession();
-  if (!session.isLoggedIn) redirect("/");
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/");
 
-  const rawTopics = await listTopicsWithHistory(session.userId);
-
+  const rawTopics = await listTopicsWithHistory(session.user.id);
   const topics: Topic[] = rawTopics.map((t) => ({
     id: t.id,
     name: t.name,
@@ -46,9 +46,7 @@ export default async function DashboardPage() {
           <p className="text-sm font-medium">No topics yet</p>
           <p className="text-xs text-muted-foreground mt-1">
             Start asking questions in{" "}
-            <Link href="/chat" className="underline underline-offset-2">
-              Chat
-            </Link>{" "}
+            <Link href="/chat" className="underline underline-offset-2">Chat</Link>{" "}
             to build your mastery profile.
           </p>
         </div>

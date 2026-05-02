@@ -1,104 +1,137 @@
-# Frontend Setup
+# Setup Guide
 
-Step-by-step guide for running the frontend locally.
-
----
-
-## Prerequisites
-
-- **Node.js 20+** — check with `node -v`
-- **npm** — comes with Node.js
-- **Backend running** — the frontend talks to the FastAPI backend. Set it up first: see `../backend/SETUP.md`
+Everything runs from the `codebase/` directory.
 
 ---
 
-## 1. Install dependencies
+## 1. Prerequisites
+
+- Node.js 20+
+- PostgreSQL running locally (or a hosted instance)
+- A Resend account (resend.com) — free tier is fine
+- A Google AI Studio API key for Gemini (aistudio.google.com)
+
+---
+
+## 2. Install dependencies
 
 ```bash
-cd frontend
 npm install
 ```
 
 ---
 
-## 2. Environment variables
+## 3. Configure environment variables
 
-The only environment variable the frontend needs is the backend API URL.
+Edit `.env.local`:
 
-In **development**, no configuration is needed — the app defaults to `http://localhost:8000`.
+| Variable | Where to get it |
+|---|---|
+| `DATABASE_URL` | Your Postgres connection string |
+| `BETTER_AUTH_SECRET` | Run: `openssl rand -base64 32` |
+| `BETTER_AUTH_URL` | Your app URL (http://localhost:3000 for dev) |
+| `NEXT_PUBLIC_APP_URL` | Same as BETTER_AUTH_URL |
+| `RESEND_API_KEY` | resend.com → API Keys |
+| `EMAIL_FROM` | Verified Resend sender, e.g. `LearnAI <noreply@yourdomain.com>` |
+| `GEMINI_API_KEY` | aistudio.google.com → Get API key |
+| `ADMIN_EMAIL` | The email address you want as admin |
 
-For **production** (e.g. Vercel), create a `.env.local` file:
-
-```bash
-cp .env.example .env.local
-```
-
-Then edit `.env.local`:
-
-```env
-NEXT_PUBLIC_API_URL=https://your-backend-domain.com
-```
-
-| Variable | Required | Default | What it does |
-|----------|----------|---------|--------------|
-| `NEXT_PUBLIC_API_URL` | No (dev) | `http://localhost:8000` | Base URL of the FastAPI backend |
-
-The `NEXT_PUBLIC_` prefix makes this variable available in the browser (not just server-side). It's read in `src/lib/config.ts`.
+Resend free-tier note: without a verified domain you can only send to your own inbox.
+For local testing set EMAIL_FROM to `onboarding@resend.dev`.
 
 ---
 
-## 3. Start the dev server
+## 4. Create the database
+
+```bash
+createdb learning_assistant
+```
+
+---
+
+## 5. Run migrations
+
+```bash
+npm run db:generate   # generates SQL from src/db/schema.ts
+npm run db:migrate    # applies to your database
+```
+
+Creates all tables: Better Auth tables (user, session, account, verification)
+and app tables (materials, topics, interactions).
+
+---
+
+## 6. Create the admin account
+
+```bash
+npm run seed:admin
+```
+
+This reads ADMIN_EMAIL from .env.local and creates a user with role="admin".
+The admin signs in via magic link — no password needed.
+
+---
+
+## 7. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-Visit `http://localhost:3000`.
-
-The landing page shows a "Sign in with Google" button and an admin login form. Neither will work until the backend is running and configured.
+Visit http://localhost:3000
 
 ---
 
-## 4. Verify it works
+## How sign-in works
 
-With the backend running at `localhost:8000`:
-
-1. Visit `http://localhost:3000` — landing page renders
-2. Click "Sign in with Google" — redirects to Google consent screen
-3. After OAuth — lands on `/dashboard`
-4. Upload a PDF at `/materials` — status goes `pending` → `ready`
-5. Ask a question at `/chat` — guided question appears
-6. Admin login — enter the seeded admin credentials, lands on `/admin/users`
+1. Go to http://localhost:3000
+2. Enter your email address
+3. Click "Send sign-in link"
+4. Open the email, click the link (expires in 5 minutes)
+5. You are signed in automatically:
+   - Students go to /dashboard
+   - Admins go to /admin/users
 
 ---
 
-## Production build
+## Useful commands
 
 ```bash
-npm run build   # compiles and type-checks
-npm run start   # serves the production build on port 3000
+npm run dev           # dev server
+npm run build         # production build + type-check
+npm run db:generate   # regenerate migrations after schema changes
+npm run db:migrate    # apply pending migrations
+npm run db:studio     # open Drizzle Studio (visual DB browser)
+npm run seed:admin    # create or promote admin user
 ```
-
-### CORS
-
-The backend's `CORS_ORIGINS` setting must include your frontend's production URL. Edit `../backend/.env`:
-
-```env
-CORS_ORIGINS=["https://your-frontend-domain.com"]
-```
-
-### Cookie security
-
-The backend sets `secure=False` on session cookies in development. For production, set `ENVIRONMENT=production` in `../backend/.env` — this switches the cookie to `secure=True` (HTTPS only).
 
 ---
 
-## Adding shadcn components
+## Students
+
+Students self-register on first sign-in. When a new email requests a magic
+link and no account exists, Better Auth creates a new user with role="student".
+No manual setup needed.
+
+---
+
+## Promoting a user to admin
+
+Set ADMIN_EMAIL to their address and run:
 
 ```bash
-npx shadcn@latest add <component-name>
+npm run seed:admin
 ```
 
-Components land in `src/components/ui/`. Do not edit files in that folder manually — re-run the add command to update them.
+If they already exist their role is updated to admin.
 
-Current installed components: `button`, `card`, `input`, `textarea`, `badge`, `progress`, `table`, `dialog`, `alert`, `skeleton`, `tabs`, `separator`, `avatar`, `select`, `label`.
+---
+
+## Production checklist
+
+- [ ] Set BETTER_AUTH_URL and NEXT_PUBLIC_APP_URL to your real domain
+- [ ] Verify sending domain in Resend, update EMAIL_FROM
+- [ ] Use a strong BETTER_AUTH_SECRET (32+ random chars)
+- [ ] Point DATABASE_URL to production DB
+- [ ] Run db:migrate against production DB
+- [ ] Run seed:admin with your real admin email

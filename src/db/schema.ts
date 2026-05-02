@@ -5,86 +5,92 @@ import {
   text,
   integer,
   timestamp,
+  boolean,
   uniqueIndex,
   index,
-  check,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 
-// ── users ────────────────────────────────────────────────────────────────────
-// Students and admin in one table. role column differentiates them.
-// CHECK constraint enforces exactly one auth method per row:
-//   student → google_sub set, password_hash NULL
-//   admin   → password_hash set, google_sub NULL
-export const users = pgTable(
-  "users",
-  {
-    id:           uuid("id").primaryKey().defaultRandom(),
-    email:        varchar("email", { length: 255 }).notNull().unique(),
-    role:         varchar("role", { length: 20 }).notNull().default("student"),
-    googleSub:    varchar("google_sub", { length: 255 }).unique(),
-    passwordHash: varchar("password_hash", { length: 255 }),
-    createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    disabledAt:   timestamp("disabled_at", { withTimezone: true }),
-  },
-  (t) => [
-    check(
-      "ck_users_auth_method",
-      sql`(${t.googleSub} IS NOT NULL AND ${t.passwordHash} IS NULL) OR
-          (${t.googleSub} IS NULL AND ${t.passwordHash} IS NOT NULL)`,
-    ),
-  ],
-);
+// ── Better Auth tables ────────────────────────────────────────────────────────
+// Column names and types MUST match what Better Auth expects exactly.
+// Do NOT rename or reorder these — BA's Drizzle adapter maps to them by name.
 
-// ── sessions ─────────────────────────────────────────────────────────────────
-// One row per sign-in event. ended_at is NULL while the session is active.
-// Interactions reference session_id so the admin log shows which login generated each question.
-export const sessions = pgTable(
-  "sessions",
-  {
-    id:        uuid("id").primaryKey().defaultRandom(),
-    userId:    uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
-    endedAt:   timestamp("ended_at", { withTimezone: true }),
-  },
-  (t) => [index("sessions_user_id_idx").on(t.userId)],
-);
+export const user = pgTable("user", {
+  id:            text("id").primaryKey(),
+  name:          text("name").notNull(),
+  email:         text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image:         text("image"),
+  createdAt:     timestamp("created_at").notNull(),
+  updatedAt:     timestamp("updated_at").notNull(),
+  // Custom app fields — declared here AND in auth.ts additionalFields
+  role:          text("role").notNull().default("student"),
+  disabledAt:    timestamp("disabled_at"),
+});
 
-// ── materials ─────────────────────────────────────────────────────────────────
-// One row per uploaded PDF or YouTube video.
-// status: "pending" → "ready" | "failed"
-// Gemini Files expire after 48h:
-//   PDFs    → saved to uploads/{userId}/{materialId}.pdf (localPath column)
-//   YouTube → full transcript stored in content column
-// getReadyMaterials() checks expiry and re-uploads from backup automatically.
+export const session = pgTable("session", {
+  id:          text("id").primaryKey(),
+  expiresAt:   timestamp("expires_at").notNull(),
+  token:       text("token").notNull().unique(),
+  createdAt:   timestamp("created_at").notNull(),
+  updatedAt:   timestamp("updated_at").notNull(),
+  ipAddress:   text("ip_address"),
+  userAgent:   text("user_agent"),
+  userId:      text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+});
+
+export const account = pgTable("account", {
+  id:                     text("id").primaryKey(),
+  accountId:              text("account_id").notNull(),
+  providerId:             text("provider_id").notNull(),
+  userId:                 text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  accessToken:            text("access_token"),
+  refreshToken:           text("refresh_token"),
+  idToken:                text("id_token"),
+  accessTokenExpiresAt:   timestamp("access_token_expires_at"),
+  refreshTokenExpiresAt:  timestamp("refresh_token_expires_at"),
+  scope:                  text("scope"),
+  password:               text("password"),
+  createdAt:              timestamp("created_at").notNull(),
+  updatedAt:              timestamp("updated_at").notNull(),
+});
+
+export const verification = pgTable("verification", {
+  id:         text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value:      text("value").notNull(),
+  expiresAt:  timestamp("expires_at").notNull(),
+  createdAt:  timestamp("created_at"),
+  updatedAt:  timestamp("updated_at"),
+});
+
+// ── Application tables ────────────────────────────────────────────────────────
+// userId is text (not uuid) to match Better Auth's user.id format.
+
 export const materials = pgTable(
   "materials",
   {
     id:           uuid("id").primaryKey().defaultRandom(),
-    userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    kind:         varchar("kind", { length: 20 }).notNull(),        // "pdf" | "youtube"
+    userId:       text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    kind:         varchar("kind", { length: 20 }).notNull(),
     displayName:  varchar("display_name", { length: 500 }).notNull(),
     sourceUri:    text("source_uri").notNull(),
-    fileSearchId: varchar("file_search_id", { length: 500 }),       // Gemini Files API file name
+    fileSearchId: varchar("file_search_id", { length: 500 }),
     status:       varchar("status", { length: 20 }).notNull().default("pending"),
     indexedAt:    timestamp("indexed_at", { withTimezone: true }),
     createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    localPath:    text("local_path"),   // relative path to saved PDF for re-upload
-    content:      text("content"),      // full transcript for YouTube re-upload
+    localPath:    text("local_path"),
+    content:      text("content"),
   },
   (t) => [index("materials_user_id_idx").on(t.userId)],
 );
 
-// ── topics ────────────────────────────────────────────────────────────────────
-// One row per (student, topic) pair. Topic name is free-form text from Gemini
-// classifier (e.g. "binary search trees"). UNIQUE(user_id, name) prevents duplicates.
 export const topics = pgTable(
   "topics",
   {
     id:           uuid("id").primaryKey().defaultRandom(),
-    userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId:       text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     name:         varchar("name", { length: 255 }).notNull(),
-    masteryScore: integer("mastery_score").notNull().default(0),    // always in [0, 100]
+    masteryScore: integer("mastery_score").notNull().default(0),
     updatedAt:    timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -93,23 +99,18 @@ export const topics = pgTable(
   ],
 );
 
-// ── interactions ──────────────────────────────────────────────────────────────
-// One row per ask/reply cycle.
-// Lifecycle:
-//   1. askAction() creates row: correctness="unscored", student_reply=NULL
-//   2. replyAction() updates:   correctness set, student_reply set, score_delta set
 export const interactions = pgTable(
   "interactions",
   {
     id:               uuid("id").primaryKey().defaultRandom(),
-    userId:           uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    sessionId:        uuid("session_id").notNull().references(() => sessions.id),
+    userId:           text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    // BA session ID stored for reference — text, no FK (BA manages session lifecycle)
+    sessionId:        text("session_id"),
     topicId:          uuid("topic_id").notNull().references(() => topics.id),
     question:         text("question").notNull(),
-    // Stored so replyAction() uses the same context that generated the question
     retrievedContext: text("retrieved_context"),
-    promptTemplate:   varchar("prompt_template", { length: 50 }).notNull(), // "recall"|"application"|"analysis"
-    response:         text("response").notNull(),     // the guided question text
+    promptTemplate:   varchar("prompt_template", { length: 50 }).notNull(),
+    response:         text("response").notNull(),
     studentReply:     text("student_reply"),
     correctness:      varchar("correctness", { length: 30 }).notNull().default("unscored"),
     scoreDelta:       integer("score_delta").notNull().default(0),
@@ -122,9 +123,9 @@ export const interactions = pgTable(
   ],
 );
 
-// Type exports — inferred from schema, used throughout the app
-export type User        = typeof users.$inferSelect;
-export type Session     = typeof sessions.$inferSelect;
+// Type exports
+export type User        = typeof user.$inferSelect;
+export type Session     = typeof session.$inferSelect;
 export type Material    = typeof materials.$inferSelect;
 export type Topic       = typeof topics.$inferSelect;
 export type Interaction = typeof interactions.$inferSelect;

@@ -1,17 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/session";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { listMaterials } from "@/db/queries/materials";
 import { MaterialsPage } from "@/components/materials/MaterialsPage";
 import type { Material } from "@/types";
 
 export default async function Page() {
-  const session = await getSession();
-  if (!session.isLoggedIn) redirect("/");
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/");
 
-  const rawMaterials = await listMaterials(session.userId);
-
+  const rawMaterials = await listMaterials(session.user.id);
   const materials: Material[] = rawMaterials.map((m) => ({
     id: m.id,
     user_id: m.userId,

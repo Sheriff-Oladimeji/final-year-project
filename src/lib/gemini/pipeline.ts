@@ -7,7 +7,6 @@ import { buildFileParts, getReadyFileIds } from "./files";
 import { getReadyMaterials } from "@/db/queries/materials";
 import { getOrCreateTopic, updateMasteryScore } from "@/db/queries/topics";
 import { createInteraction, updateInteraction, getInteraction } from "@/db/queries/interactions";
-import { findActiveSession, createSession } from "@/db/queries/sessions";
 import { getMasteryTier, scoreDelta, clipScore } from "@/lib/mastery";
 import {
   CLASSIFY_TOPIC_TEMPLATE,
@@ -19,10 +18,7 @@ import type { AskResponse, ReplyResponse, Citation } from "@/types";
 
 async function generate(prompt: string): Promise<string> {
   const client = getClient();
-  const response = await client.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: prompt,
-  });
+  const response = await client.models.generateContent({ model: GEMINI_MODEL, contents: prompt });
   return response.text?.trim() ?? "";
 }
 
@@ -37,8 +33,7 @@ async function generateWithFiles(prompt: string, fileParts: Part[]): Promise<str
 }
 
 async function classifyTopic(question: string, fileParts: Part[]): Promise<string> {
-  const prompt = CLASSIFY_TOPIC_TEMPLATE(question);
-  let label = await generateWithFiles(prompt, fileParts);
+  let label = await generateWithFiles(CLASSIFY_TOPIC_TEMPLATE(question), fileParts);
   label = label.toLowerCase().trim().replace(/\.$/, "");
   return label.length > 100 ? label.slice(0, 100) : label;
 }
@@ -47,8 +42,7 @@ async function retrieveContext(
   question: string,
   fileParts: Part[],
 ): Promise<{ contextText: string; citations: Citation[] }> {
-  const prompt = RETRIEVE_PROMPT(question);
-  const raw = await generateWithFiles(prompt, fileParts);
+  const raw = await generateWithFiles(RETRIEVE_PROMPT(question), fileParts);
 
   if (raw.includes("NO_RELEVANT_CONTENT")) {
     return { contextText: "No directly relevant material found.", citations: [] };
@@ -83,10 +77,7 @@ async function retrieveContext(
   }
 
   if (citations.length === 0) {
-    return {
-      contextText: raw,
-      citations: [{ source: "course material", excerpt: raw.slice(0, 500) }],
-    };
+    return { contextText: raw, citations: [{ source: "course material", excerpt: raw.slice(0, 500) }] };
   }
 
   return { contextText: contextParts.join("\n\n"), citations };
@@ -98,18 +89,16 @@ async function classifyCorrectness(
   studentReply: string,
   hintRequested: boolean,
 ): Promise<string> {
-  const prompt = CLASSIFY_CORRECTNESS_TEMPLATE(guidedQuestion, context, studentReply, hintRequested);
-  const raw = await generate(prompt);
+  const raw = await generate(CLASSIFY_CORRECTNESS_TEMPLATE(guidedQuestion, context, studentReply, hintRequested));
   const label = raw.trim().toLowerCase().split(/\s/)[0] ?? "incorrect";
   return ["correct", "correct_with_hint", "incorrect"].includes(label) ? label : "incorrect";
 }
 
-async function getOrCreateActiveSession(userId: string) {
-  const session = await findActiveSession(userId);
-  return session ?? createSession(userId);
-}
-
-export async function ask(question: string, userId: string): Promise<AskResponse> {
+export async function ask(
+  question: string,
+  userId: string,
+  sessionId?: string,
+): Promise<AskResponse> {
   const materials = await getReadyMaterials(userId);
   if (materials.length === 0) {
     throw new Error(
@@ -131,15 +120,12 @@ export async function ask(question: string, userId: string): Promise<AskResponse
 
   const topic = await getOrCreateTopic(userId, topicLabel);
   const tier = getMasteryTier(topic.masteryScore);
-  const templateFn = TIER_TEMPLATES[tier];
-  const prompt = templateFn(question, contextText, topicLabel);
+  const prompt = TIER_TEMPLATES[tier](question, contextText, topicLabel);
   const guidedQuestion = await generateWithFiles(prompt, fileParts);
-
-  const session = await getOrCreateActiveSession(userId);
 
   const interaction = await createInteraction({
     userId,
-    sessionId: session.id,
+    sessionId,
     topicId: topic.id,
     question,
     retrievedContext: contextText,
@@ -160,6 +146,7 @@ export async function reply(
   studentReply: string,
   hintRequested: boolean,
   userId: string,
+  sessionId?: string,
 ): Promise<ReplyResponse> {
   const interaction = await getInteraction(interactionId, userId);
   if (!interaction) throw new Error("Interaction not found");
@@ -176,18 +163,13 @@ export async function reply(
   );
 
   const delta = scoreDelta(correctness);
-
   const topicRows = await db.select().from(topics).where(eq(topics.id, interaction.topicId));
   const topic = topicRows[0];
   const newScore = clipScore(topic.masteryScore + delta);
 
   await Promise.all([
     updateMasteryScore(interaction.topicId, newScore),
-    updateInteraction(interactionId, userId, {
-      studentReply,
-      correctness,
-      scoreDelta: delta,
-    }),
+    updateInteraction(interactionId, userId, { studentReply, correctness, scoreDelta: delta }),
   ]);
 
   const materials = await getReadyMaterials(userId);
@@ -199,14 +181,12 @@ export async function reply(
     if (fileIds.length > 0) {
       const fileParts = buildFileParts(fileIds);
       const nextTier = getMasteryTier(newScore);
-      const templateFn = TIER_TEMPLATES[nextTier];
-      const prompt = templateFn(interaction.question, contextText, topic.name);
+      const prompt = TIER_TEMPLATES[nextTier](interaction.question, contextText, topic.name);
       nextGuidedQuestion = await generateWithFiles(prompt, fileParts);
 
-      const session = await getOrCreateActiveSession(userId);
       const nextInteraction = await createInteraction({
         userId,
-        sessionId: session.id,
+        sessionId,
         topicId: topic.id,
         question: interaction.question,
         retrievedContext: contextText,

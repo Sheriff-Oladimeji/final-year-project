@@ -1,23 +1,18 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/session";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { StudentNav } from "@/components/nav/StudentNav";
 
-export default async function StudentLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const session = await getSession();
-  if (!session.isLoggedIn || session.role !== "student") redirect("/");
+export default async function StudentLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || session.user.role !== "student" || session.user.disabledAt) redirect("/");
 
   return (
     <div className="min-h-screen flex flex-col">
       <StudentNav />
-      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8">
-        {children}
-      </main>
+      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8">{children}</main>
     </div>
   );
 }
