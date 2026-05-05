@@ -25,7 +25,7 @@ export const auth = betterAuth({
     magicLink({
       sendMagicLink: async ({ email, url }) => {
         await resend.emails.send({
-          from: process.env.EMAIL_FROM ?? "LearnAI <noreply@learnaai.app>",
+          from: "LearnAI <noreply@learnly.brikta.dev>",
           to: email,
           subject: "Your sign-in link for LearnAI",
           html: `
