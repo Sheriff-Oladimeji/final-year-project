@@ -15,7 +15,7 @@ export async function validateAdminEmailAction(
 ): Promise<{ valid: boolean; error?: string }> {
   const u = await findByEmail(email.trim().toLowerCase());
   if (!u) return { valid: false, error: "No account found for this email." };
-  if (u.role !== "admin") return { valid: false, error: "This email is not an admin account." };
+  if (!u.isAdmin) return { valid: false, error: "This email is not an admin account." };
   if (u.disabledAt) return { valid: false, error: "This account has been disabled." };
   return { valid: true };
 }

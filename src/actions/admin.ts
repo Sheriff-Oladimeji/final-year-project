@@ -7,7 +7,7 @@ import { disableUser, deleteUser } from "@/db/queries/users";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isAdmin) {
     return { error: "Unauthorised" } as const;
   }
   return null;

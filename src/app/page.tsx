@@ -27,10 +27,7 @@ const features = [
 
 export default async function LandingPage() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (session?.user) {
-    if (session.user.role === "admin") redirect("/admin/users");
-    redirect("/dashboard");
-  }
+  if (session?.user) redirect("/dashboard");
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">

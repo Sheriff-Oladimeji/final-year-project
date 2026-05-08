@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Library, LogOut, BrainCircuit, ShieldCheck } from "lucide-react";
+import { Users, ScrollText, ShieldCheck, LayoutDashboard, LogOut } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 const links = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/materials", label: "Materials", icon: Library },
+  { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/interactions", label: "Interactions", icon: ScrollText },
 ];
 
-export function StudentSidebar({ isAdmin }: { isAdmin: boolean }) {
+export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -30,9 +30,9 @@ export function StudentSidebar({ isAdmin }: { isAdmin: boolean }) {
       {/* Brand */}
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
         <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
-          <BrainCircuit className="size-4 text-primary-foreground" />
+          <ShieldCheck className="size-4 text-primary-foreground" />
         </div>
-        <span className="font-bold text-sm tracking-tight">LearnAI</span>
+        <span className="font-bold text-sm tracking-tight">Admin</span>
       </div>
 
       {/* Nav */}
@@ -55,22 +55,17 @@ export function StudentSidebar({ isAdmin }: { isAdmin: boolean }) {
             </Link>
           );
         })}
-      </nav>
 
-      {/* Admin link */}
-      {isAdmin && (
-        <div className="px-3 pt-2">
-          <div className="border-t border-border pt-2">
-            <Link
-              href="/admin/users"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
-            >
-              <ShieldCheck className="size-4 shrink-0 text-primary" />
-              Admin Panel
-            </Link>
-          </div>
+        <div className="pt-2 border-t border-border mt-2">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
+          >
+            <LayoutDashboard className="size-4 shrink-0" />
+            Student View
+          </Link>
         </div>
-      )}
+      </nav>
 
       {/* Sign out */}
       <div className="border-t border-border p-3">

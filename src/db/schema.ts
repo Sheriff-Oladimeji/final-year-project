@@ -24,6 +24,7 @@ export const user = pgTable("user", {
   updatedAt:     timestamp("updated_at").notNull(),
   // Custom app fields — declared here AND in auth.ts additionalFields
   role:          text("role").notNull().default("student"),
+  isAdmin:       boolean("is_admin").notNull().default(false),
   disabledAt:    timestamp("disabled_at"),
 });
 

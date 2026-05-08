@@ -6,7 +6,7 @@ import { ask, reply } from "@/lib/gemini/pipeline";
 
 async function requireStudent() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "student" || session.user.disabledAt) {
+  if (!session || session.user.disabledAt) {
     return { error: "Unauthorised" } as const;
   }
   return session;

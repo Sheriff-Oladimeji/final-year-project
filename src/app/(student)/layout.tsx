@@ -7,12 +7,11 @@ import { StudentSidebar } from "@/components/nav/StudentSidebar";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  const role = session?.user.role ?? "";
-  if (!session || !["student", "admin"].includes(role) || session.user.disabledAt) redirect("/");
+  if (!session || session.user.disabledAt) redirect("/");
 
   return (
     <div className="flex min-h-screen">
-      <StudentSidebar />
+      <StudentSidebar isAdmin={session.user.isAdmin ?? false} />
       <main className="flex-1 min-w-0 px-8 py-8">{children}</main>
     </div>
   );
