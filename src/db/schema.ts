@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // ── Better Auth tables ────────────────────────────────────────────────────────
 // Column names and types MUST match what Better Auth expects exactly.
@@ -81,6 +82,7 @@ export const materials = pgTable(
     createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     localPath:    text("local_path"),
     content:      text("content"),
+    suggestions:  text("suggestions").array().notNull().default(sql`ARRAY[]::text[]`),
   },
   (t) => [index("materials_user_id_idx").on(t.userId)],
 );

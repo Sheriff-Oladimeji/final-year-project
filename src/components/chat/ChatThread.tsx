@@ -1,287 +1,251 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, Fragment } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import { Sparkles, BookOpen, AlertCircle } from "lucide-react";
 import {
-  Send,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  BookOpen,
-  Sparkles,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputTextarea,
+  PromptInputSubmit,
+  PromptInputFooter,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
+import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion";
+import {
+  Sources,
+  SourcesContent,
+  SourcesTrigger,
+} from "@/components/ai-elements/sources";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { askAction, replyAction } from "@/actions/chat";
-import type { Citation, Correctness } from "@/types";
 import { cn } from "@/lib/utils";
-
-// ── Turn types ──────────────────────────────────────────────────────────────
-
-type QuestionTurn = {
-  type: "question";
-  content: string;
-  topic: string;
-  citations: Citation[];
-  interactionId: string;
-};
-
-type ReplyTurn = {
-  type: "reply";
-  content: string;
-  correctness: Correctness;
-  scoreDelta: number;
-  newScore: number;
-};
-
-type Turn = QuestionTurn | ReplyTurn;
-
-// ── Correctness display ─────────────────────────────────────────────────────
-
-const CORRECTNESS_STYLES: Record<Correctness, { label: string; className: string }> = {
-  correct: {
-    label: "Correct",
-    className: "bg-emerald-100/80 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
-  },
-  correct_with_hint: {
-    label: "Correct with hint",
-    className: "bg-amber-100/80 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
-  },
-  incorrect: {
-    label: "Incorrect",
-    className: "bg-red-100/80 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-  },
-};
-
-// ── Sub-components ───────────────────────────────────────────────────────────
-
-function CitationsAccordion({ citations }: { citations: Citation[] }) {
-  const [open, setOpen] = useState(false);
-  if (citations.length === 0) return null;
-  return (
-    <div className="mt-2">
-      <button
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        onClick={() => setOpen((o) => !o)}
-      >
-        <BookOpen className="size-3" />
-        {citations.length} source{citations.length > 1 ? "s" : ""}
-        {open ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-      </button>
-      {open && (
-        <div className="mt-2 space-y-2">
-          {citations.map((c, i) => (
-            <div key={i} className="rounded-lg bg-muted/50 p-3 text-xs">
-              <p className="font-medium text-muted-foreground mb-1">{c.source}</p>
-              <p className="text-foreground leading-relaxed">{c.excerpt}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function QuestionBubble({ turn }: { turn: QuestionTurn }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-xs capitalize bg-primary/10 text-primary border-primary/20">
-          {turn.topic}
-        </Badge>
-      </div>
-      <div className="rounded-xl rounded-tl-sm border-l-2 border-primary/40 bg-muted px-4 py-3 text-sm leading-relaxed max-w-2xl">
-        {turn.content}
-      </div>
-      <CitationsAccordion citations={turn.citations} />
-    </div>
-  );
-}
-
-function ReplyBubble({ turn }: { turn: ReplyTurn }) {
-  const style = CORRECTNESS_STYLES[turn.correctness];
-  const deltaSign = turn.scoreDelta >= 0 ? "+" : "";
-  return (
-    <div className="flex flex-col items-end gap-1.5">
-      <div className="rounded-xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-3 text-sm leading-relaxed max-w-2xl">
-        {turn.content}
-      </div>
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className={cn("text-xs", style.className)}>
-          {style.label}
-        </Badge>
-        <span className="text-xs text-muted-foreground">
-          {deltaSign}{turn.scoreDelta} pts · score {turn.newScore}/100
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ── Main component ───────────────────────────────────────────────────────────
+import type { ChatMessage } from "@/lib/ai/chat-types";
+import type { Correctness } from "@/types";
 
 interface ChatThreadProps {
   materialId: string;
   materialName: string;
+  suggestions: string[];
 }
 
-export function ChatThread({ materialId, materialName }: ChatThreadProps) {
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [currentInteractionId, setCurrentInteractionId] = useState<string | null>(null);
-  const [phase, setPhase] = useState<"ask" | "reply">("ask");
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+const CORRECTNESS_STYLES: Record<Correctness, { label: string; className: string }> = {
+  correct: {
+    label: "Correct",
+    className:
+      "bg-emerald-100/80 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
+  },
+  correct_with_hint: {
+    label: "Correct with hint",
+    className:
+      "bg-amber-100/80 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+  },
+  incorrect: {
+    label: "Incorrect",
+    className:
+      "bg-red-100/80 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
+  },
+};
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [turns]);
+export function ChatThread({ materialId, materialName, suggestions }: ChatThreadProps) {
+  const [text, setText] = useState("");
+  const [interactionId, setInteractionId] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput("");
-    setError(null);
-    setLoading(true);
-
-    try {
-      if (phase === "ask") {
-        const result = await askAction(text, materialId);
-        if ("error" in result) {
-          setError(result.error ?? "Something went wrong.");
-          return;
-        }
-        const res = result.data;
-        setTurns((prev) => [
-          ...prev,
-          {
-            type: "question",
-            content: res.guided_question,
-            topic: res.topic,
-            citations: res.citations,
-            interactionId: res.interaction_id,
-          },
-        ]);
-        setCurrentInteractionId(res.interaction_id);
-        setPhase("reply");
-      } else {
-        const result = await replyAction(currentInteractionId!, text, materialId);
-        if ("error" in result) {
-          setError(result.error ?? "Something went wrong.");
-          return;
-        }
-        const res = result.data;
-        const prevTopic = turns.findLast((t) => t.type === "question") as QuestionTurn | undefined;
-        setTurns((prev) => [
-          ...prev,
-          {
-            type: "reply",
-            content: text,
-            correctness: res.correctness,
-            scoreDelta: res.score_delta,
-            newScore: res.new_score,
-          },
-          {
-            type: "question",
-            content: res.next_guided_question,
-            topic: prevTopic?.topic ?? "",
-            citations: [],
-            interactionId: res.next_interaction_id,
-          },
-        ]);
-        setCurrentInteractionId(res.next_interaction_id);
+  const { messages, sendMessage, status, error } = useChat<ChatMessage>({
+    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    onData: ({ type, data }) => {
+      if (type === "data-interaction") {
+        setInteractionId((data as { id: string }).id);
       }
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    },
+  });
+
+  function send(userText: string) {
+    const trimmed = userText.trim();
+    if (!trimmed) return;
+    sendMessage(
+      { text: trimmed },
+      { body: { materialId, interactionId: interactionId ?? undefined } },
+    );
+    setText("");
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e as unknown as React.FormEvent);
-    }
+  function handleSubmit(message: PromptInputMessage) {
+    if (message.text) send(message.text);
   }
 
-  const placeholder =
-    phase === "ask"
-      ? `Ask a question about ${materialName}…`
-      : "Type your answer to the guided question…";
+  const submitStatus =
+    status === "submitted" || status === "streaming"
+      ? (status as "submitted" | "streaming")
+      : status === "error"
+        ? "error"
+        : "ready";
+
+  const showSuggestions = messages.length === 0 && suggestions.length > 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)]">
-      {/* Thread */}
-      <div className="flex-1 overflow-y-auto space-y-6 pb-4">
-        {turns.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-5 px-4">
-            <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
-              <Sparkles className="size-6 text-primary" />
-            </div>
-            <div className="space-y-1.5 max-w-md">
-              <p className="text-sm font-semibold text-foreground">
-                Ask anything about <span className="text-primary">{materialName}</span>
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Your guide responds with questions calibrated to your mastery level (recall, application, analysis) instead of direct answers. Reply to each one and your score updates.
-              </p>
-            </div>
-          </div>
-        )}
+    <div className="flex h-[calc(100vh-10rem)] flex-col">
+      <Conversation className="flex-1">
+        <ConversationContent className="px-0">
+          {messages.length === 0 && (
+            <ConversationEmptyState
+              icon={<Sparkles className="size-10 text-primary" />}
+              title={`Ask anything about ${materialName}`}
+              description="Your guide responds with questions calibrated to your mastery level (recall, application, analysis) instead of direct answers."
+            />
+          )}
 
-        {turns.map((turn, i) =>
-          turn.type === "question" ? (
-            <QuestionBubble key={i} turn={turn} />
-          ) : (
-            <ReplyBubble key={i} turn={turn} />
-          ),
-        )}
+          {messages.map((message) => (
+            <Fragment key={message.id}>
+              {message.role === "assistant" && <AssistantTurn message={message} />}
+              {message.role === "user" && (
+                <Message from="user">
+                  <MessageContent>
+                    {message.parts.map((part, i) =>
+                      part.type === "text" ? (
+                        <span key={i} className="whitespace-pre-wrap">
+                          {part.text}
+                        </span>
+                      ) : null,
+                    )}
+                  </MessageContent>
+                </Message>
+              )}
+            </Fragment>
+          ))}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
-        {loading && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin text-primary" />
-            {phase === "ask" ? "Generating guided question…" : "Scoring your answer…"}
-          </div>
-        )}
-
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Error */}
       {error && (
-        <div className="pb-3">
-          <Alert variant="destructive">
-            <AlertDescription className="text-xs">{error}</AlertDescription>
-          </Alert>
+        <Alert variant="destructive" className="mt-3 mb-2">
+          <AlertCircle className="size-4" />
+          <AlertDescription className="text-xs">
+            Couldn&apos;t process that. Please try again.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {showSuggestions && (
+        <div className="mb-3">
+          <Suggestions>
+            {suggestions.map((s) => (
+              <Suggestion key={s} suggestion={s} onClick={(v) => send(v)} />
+            ))}
+          </Suggestions>
         </div>
       )}
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="flex gap-2 items-end pt-3 border-t border-border">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={loading}
-          rows={2}
-          className="resize-none flex-1 text-sm"
-        />
-        <Button type="submit" size="icon" disabled={loading || !input.trim()}>
-          {loading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Send className="size-4" />
-          )}
-        </Button>
-      </form>
-      <p className="text-xs text-muted-foreground mt-1.5 text-center">
-        Enter to send · Shift+Enter for new line
-      </p>
+      <PromptInput onSubmit={handleSubmit} className="border-t-0">
+        <PromptInputBody>
+          <PromptInputTextarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={
+              interactionId
+                ? "Type your answer to the guided question…"
+                : `Ask anything about ${materialName}…`
+            }
+          />
+        </PromptInputBody>
+        <PromptInputFooter>
+          <span className="text-xs text-muted-foreground">
+            Enter to send · Shift+Enter for new line
+          </span>
+          <PromptInputSubmit status={submitStatus} disabled={!text.trim()} />
+        </PromptInputFooter>
+      </PromptInput>
     </div>
+  );
+}
+
+function AssistantTurn({ message }: { message: ChatMessage }) {
+  let topic: string | null = null;
+  let citations: { source: string; excerpt: string }[] = [];
+  let score: { correctness: Correctness; score_delta: number; new_score: number } | null = null;
+  const textChunks: string[] = [];
+
+  for (const part of message.parts) {
+    if (part.type === "text") {
+      textChunks.push(part.text);
+    } else if (part.type === "data-topic") {
+      topic = part.data.name;
+    } else if (part.type === "data-citations") {
+      citations = part.data.items;
+    } else if (part.type === "data-score") {
+      score = part.data;
+    }
+  }
+
+  const text = textChunks.join("");
+  const correctnessStyle = score ? CORRECTNESS_STYLES[score.correctness] : null;
+
+  return (
+    <Message from="assistant">
+      <div className="flex flex-col gap-2">
+        {(topic || score) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {topic && (
+              <Badge
+                variant="outline"
+                className="bg-primary/10 text-primary border-primary/20 text-xs capitalize"
+              >
+                {topic}
+              </Badge>
+            )}
+            {score && correctnessStyle && (
+              <>
+                <Badge variant="outline" className={cn("text-xs", correctnessStyle.className)}>
+                  {correctnessStyle.label}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {score.score_delta >= 0 ? "+" : ""}
+                  {score.score_delta} pts · score {score.new_score}/100
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        <MessageContent className="border-l-2 border-primary/40 pl-4">
+          {text ? (
+            <MessageResponse>{text}</MessageResponse>
+          ) : (
+            <span className="text-sm text-muted-foreground">Thinking…</span>
+          )}
+        </MessageContent>
+
+        {citations.length > 0 && (
+          <Sources>
+            <SourcesTrigger count={citations.length}>
+              <BookOpen className="size-3" />
+              <span className="font-medium">
+                {citations.length} source{citations.length > 1 ? "s" : ""}
+              </span>
+            </SourcesTrigger>
+            <SourcesContent className="space-y-2">
+              {citations.map((c, i) => (
+                <div key={i} className="rounded-lg bg-muted/50 p-3 text-xs">
+                  <p className="font-medium text-muted-foreground mb-1">{c.source}</p>
+                  <p className="text-foreground leading-relaxed">{c.excerpt}</p>
+                </div>
+              ))}
+            </SourcesContent>
+          </Sources>
+        )}
+      </div>
+    </Message>
   );
 }

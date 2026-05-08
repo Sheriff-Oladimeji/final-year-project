@@ -3,17 +3,34 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { createMaterial, deleteMaterial, setMaterialStatus, getMaterial } from "@/db/queries/materials";
+import {
+  createMaterial,
+  deleteMaterial,
+  setMaterialStatus,
+  setMaterialSuggestions,
+  getMaterial,
+} from "@/db/queries/materials";
 import { saveFile, deleteFile } from "@/lib/uploads";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadBytes, uploadFromPath, deleteGeminiFile } from "@/lib/gemini/files";
+import { generateMaterialSuggestions } from "@/lib/ai/suggestions";
 
 async function requireStudent() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "student" || session.user.disabledAt) {
+  if (!session || session.user.disabledAt) {
     return { error: "Unauthorised" } as const;
   }
   return session;
+}
+
+// Run suggestion generation in the background — don't block the upload response.
+async function persistSuggestions(materialId: string, userId: string) {
+  const material = await getMaterial(materialId, userId);
+  if (!material) return;
+  const suggestions = await generateMaterialSuggestions(material);
+  if (suggestions.length > 0) {
+    await setMaterialSuggestions(materialId, suggestions);
+  }
 }
 
 export async function uploadPdfAction(formData: FormData) {
@@ -38,6 +55,10 @@ export async function uploadPdfAction(formData: FormData) {
     const fileSearchId = await uploadFromPath(localPath, "application/pdf", file.name);
 
     await setMaterialStatus(material.id, "ready", { fileSearchId, indexedAt: new Date() });
+
+    // Fire-and-forget: generate starter questions in the background.
+    void persistSuggestions(material.id, session.user.id);
+
     revalidatePath("/materials");
     return { data: { id: material.id, status: "ready" } };
   } catch (err: unknown) {
@@ -79,6 +100,9 @@ export async function submitYoutubeAction(formData: FormData) {
       displayName,
     );
     await setMaterialStatus(material.id, "ready", { fileSearchId, indexedAt: new Date() });
+
+    void persistSuggestions(material.id, session.user.id);
+
     revalidatePath("/materials");
     return { data: { id: material.id, status: "ready" } };
   } catch (err: unknown) {

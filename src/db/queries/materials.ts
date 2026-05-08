@@ -46,6 +46,13 @@ export async function setMaterialStatus(
     .where(eq(materials.id, id));
 }
 
+export async function setMaterialSuggestions(id: string, suggestions: string[]): Promise<void> {
+  await db
+    .update(materials)
+    .set({ suggestions })
+    .where(eq(materials.id, id));
+}
+
 export async function deleteMaterial(id: string, userId: string): Promise<void> {
   const m = await getMaterial(id, userId);
   if (!m) return;

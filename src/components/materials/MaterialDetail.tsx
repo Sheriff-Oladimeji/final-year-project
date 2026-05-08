@@ -86,7 +86,11 @@ export function MaterialDetail({ material }: MaterialDetailProps) {
 
       {/* Body */}
       {material.status === "ready" ? (
-        <ChatThread materialId={material.id} materialName={material.display_name} />
+        <ChatThread
+          materialId={material.id}
+          materialName={material.display_name}
+          suggestions={material.suggestions}
+        />
       ) : material.status === "pending" ? (
         <div className="rounded-xl border border-dashed border-border py-20 text-center">
           <div className="flex flex-col items-center gap-4">

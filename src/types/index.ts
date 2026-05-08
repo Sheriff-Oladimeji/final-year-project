@@ -23,6 +23,7 @@ export interface Material {
   status: MaterialStatus;
   indexed_at: string | null;
   created_at: string;
+  suggestions: string[];
 }
 
 export interface Citation {

@@ -28,6 +28,7 @@ export default async function MaterialPage({ params }: PageProps) {
     status: raw.status as Material["status"],
     indexed_at: raw.indexedAt?.toISOString() ?? null,
     created_at: raw.createdAt.toISOString(),
+    suggestions: raw.suggestions ?? [],
   };
 
   return <MaterialDetail material={material} />;

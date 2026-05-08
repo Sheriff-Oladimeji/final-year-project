@@ -38,6 +38,7 @@ export default async function DashboardPage() {
     status: m.status as Material["status"],
     indexed_at: m.indexedAt?.toISOString() ?? null,
     created_at: m.createdAt.toISOString(),
+    suggestions: m.suggestions ?? [],
   }));
 
   const readyMaterials = materials.filter((m) => m.status === "ready");

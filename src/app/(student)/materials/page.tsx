@@ -21,6 +21,7 @@ export default async function Page() {
     status: m.status as Material["status"],
     indexed_at: m.indexedAt?.toISOString() ?? null,
     created_at: m.createdAt.toISOString(),
+    suggestions: m.suggestions ?? [],
   }));
 
   return <MaterialsPage initialMaterials={materials} />;

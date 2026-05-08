@@ -92,3 +92,16 @@ export const TIER_TEMPLATES = {
   application: APPLICATION_TEMPLATE,
   analysis: ANALYSIS_TEMPLATE,
 } as const;
+
+export const SUGGESTIONS_PROMPT = `\
+You are creating starter questions for a learning session about the attached
+course material.
+
+Generate exactly 4 short, distinct questions a student might ask to understand
+this material better. Cover different angles: definition, mechanism, application,
+and limitation/trade-off.
+
+Each question should be 8 to 14 words. Phrase them as natural questions a real
+student would type. Do not number or prefix them. Do not reference "the material"
+or "this document".
+`;

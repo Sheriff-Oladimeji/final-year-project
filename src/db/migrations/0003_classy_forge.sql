@@ -1,0 +1,1 @@
+ALTER TABLE "materials" ADD COLUMN "suggestions" text[] DEFAULT ARRAY[]::text[] NOT NULL;
