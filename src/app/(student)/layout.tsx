@@ -7,7 +7,7 @@ import { StudentNav } from "@/components/nav/StudentNav";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "student" || session.user.disabledAt) redirect("/");
+  if (!session || !["student", "admin"].includes(session.user.role) || session.user.disabledAt) redirect("/");
 
   return (
     <div className="min-h-screen flex flex-col">
