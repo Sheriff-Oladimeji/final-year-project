@@ -13,7 +13,12 @@ const links = [
   { href: "/materials", label: "Materials", icon: Library },
 ];
 
-export function StudentSidebar({ isAdmin }: { isAdmin: boolean }) {
+interface StudentSidebarProps {
+  isAdmin: boolean;
+  userEmail: string;
+}
+
+export function StudentSidebar({ isAdmin, userEmail }: StudentSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -25,20 +30,22 @@ export function StudentSidebar({ isAdmin }: { isAdmin: boolean }) {
     router.refresh();
   }
 
+  const initial = userEmail.charAt(0).toUpperCase();
+
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-border bg-card sticky top-0">
       {/* Brand */}
-      <div className="flex h-14 items-center gap-2 border-b border-border px-4">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
         <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
           <BrainCircuit className="size-4 text-primary-foreground" />
         </div>
         <span className="font-bold text-sm tracking-tight">LearnAI</span>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 space-y-0.5 p-3">
+      {/* Nav (scrollable when content overflows) */}
+      <nav className="flex-1 min-h-0 overflow-y-auto space-y-0.5 p-3">
         {links.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+          const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
               key={href}
@@ -55,12 +62,9 @@ export function StudentSidebar({ isAdmin }: { isAdmin: boolean }) {
             </Link>
           );
         })}
-      </nav>
 
-      {/* Admin link */}
-      {isAdmin && (
-        <div className="px-3 pt-2">
-          <div className="border-t border-border pt-2">
+        {isAdmin && (
+          <div className="pt-2 mt-2 border-t border-border">
             <Link
               href="/admin/users"
               className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
@@ -69,11 +73,19 @@ export function StudentSidebar({ isAdmin }: { isAdmin: boolean }) {
               Admin Panel
             </Link>
           </div>
-        </div>
-      )}
+        )}
+      </nav>
 
-      {/* Sign out */}
-      <div className="border-t border-border p-3">
+      {/* Footer: user + sign out (always visible) */}
+      <div className="shrink-0 border-t border-border p-3 space-y-2">
+        <div className="flex items-center gap-2.5 px-3 py-1.5 min-w-0">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-xs font-semibold">
+            {initial}
+          </div>
+          <span className="text-xs text-muted-foreground truncate" title={userEmail}>
+            {userEmail}
+          </span>
+        </div>
         <button
           onClick={handleSignOut}
           disabled={signingOut}

@@ -3,8 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { topics } from "@/db/schema";
 import { getClient, GEMINI_MODEL } from "./client";
-import { buildFileParts, getReadyFileIds } from "./files";
-import { getReadyMaterials } from "@/db/queries/materials";
+import { buildFileParts, getActiveFiles } from "./files";
+import { getReadyMaterial } from "@/db/queries/materials";
 import { getOrCreateTopic, updateMasteryScore } from "@/db/queries/topics";
 import { createInteraction, updateInteraction, getInteraction } from "@/db/queries/interactions";
 import { getMasteryTier, scoreDelta, clipScore } from "@/lib/mastery";
@@ -97,21 +97,20 @@ async function classifyCorrectness(
 export async function ask(
   question: string,
   userId: string,
+  materialId: string,
   sessionId?: string,
 ): Promise<AskResponse> {
-  const materials = await getReadyMaterials(userId);
-  if (materials.length === 0) {
-    throw new Error(
-      "You have no indexed materials yet. Please upload a PDF or YouTube URL before asking a question.",
-    );
+  const material = await getReadyMaterial(materialId, userId);
+  if (!material) {
+    throw new Error("This material is not ready yet. Wait for indexing to complete or try another material.");
   }
 
-  const fileIds = await getReadyFileIds(materials);
-  if (fileIds.length === 0) {
-    throw new Error("None of your materials could be loaded. Please re-upload them.");
+  const activeFiles = await getActiveFiles([material]);
+  if (activeFiles.length === 0) {
+    throw new Error("This material could not be loaded. Try re-uploading it.");
   }
 
-  const fileParts = buildFileParts(fileIds);
+  const fileParts = buildFileParts(activeFiles);
 
   const [topicLabel, { contextText, citations }] = await Promise.all([
     classifyTopic(question, fileParts),
@@ -126,6 +125,7 @@ export async function ask(
   const interaction = await createInteraction({
     userId,
     sessionId,
+    materialId,
     topicId: topic.id,
     question,
     retrievedContext: contextText,
@@ -146,6 +146,7 @@ export async function reply(
   studentReply: string,
   hintRequested: boolean,
   userId: string,
+  materialId: string,
   sessionId?: string,
 ): Promise<ReplyResponse> {
   const interaction = await getInteraction(interactionId, userId);
@@ -172,14 +173,14 @@ export async function reply(
     updateInteraction(interactionId, userId, { studentReply, correctness, scoreDelta: delta }),
   ]);
 
-  const materials = await getReadyMaterials(userId);
+  const material = await getReadyMaterial(materialId, userId);
   let nextGuidedQuestion = "";
   let nextInteractionId = "";
 
-  if (materials.length > 0) {
-    const fileIds = await getReadyFileIds(materials);
-    if (fileIds.length > 0) {
-      const fileParts = buildFileParts(fileIds);
+  if (material) {
+    const activeFiles = await getActiveFiles([material]);
+    if (activeFiles.length > 0) {
+      const fileParts = buildFileParts(activeFiles);
       const nextTier = getMasteryTier(newScore);
       const prompt = TIER_TEMPLATES[nextTier](interaction.question, contextText, topic.name);
       nextGuidedQuestion = await generateWithFiles(prompt, fileParts);
@@ -187,6 +188,7 @@ export async function reply(
       const nextInteraction = await createInteraction({
         userId,
         sessionId,
+        materialId,
         topicId: topic.id,
         question: interaction.question,
         retrievedContext: contextText,

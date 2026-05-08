@@ -43,17 +43,21 @@ export async function deleteGeminiFile(fileSearchId: string): Promise<void> {
   }
 }
 
-export function buildFileParts(fileSearchIds: string[]): Part[] {
-  return fileSearchIds.map((id) => ({
+export function buildFileParts(
+  files: Array<{ fileSearchId: string; kind: string }>,
+): Part[] {
+  return files.map((f) => ({
     fileData: {
-      fileUri: `https://generativelanguage.googleapis.com/v1beta/${id}`,
-      mimeType: "application/octet-stream",
+      fileUri: `https://generativelanguage.googleapis.com/v1beta/${f.fileSearchId}`,
+      mimeType: f.kind === "pdf" ? "application/pdf" : "text/plain",
     },
   }));
 }
 
-export async function getReadyFileIds(materials: Material[]): Promise<string[]> {
-  const liveIds: string[] = [];
+export async function getActiveFiles(
+  materials: Material[],
+): Promise<Array<{ fileSearchId: string; kind: string }>> {
+  const live: Array<{ fileSearchId: string; kind: string }> = [];
 
   for (const material of materials) {
     if (!material.fileSearchId) continue;
@@ -84,8 +88,8 @@ export async function getReadyFileIds(materials: Material[]): Promise<string[]> 
       }
     }
 
-    liveIds.push(fileId);
+    live.push({ fileSearchId: fileId, kind: material.kind });
   }
 
-  return liveIds;
+  return live;
 }

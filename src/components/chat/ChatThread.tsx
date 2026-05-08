@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import {
   Send,
   Loader2,
   ChevronDown,
   ChevronUp,
   BookOpen,
-  BrainCircuit,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -122,7 +121,12 @@ function ReplyBubble({ turn }: { turn: ReplyTurn }) {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export function ChatThread() {
+interface ChatThreadProps {
+  materialId: string;
+  materialName: string;
+}
+
+export function ChatThread({ materialId, materialName }: ChatThreadProps) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [currentInteractionId, setCurrentInteractionId] = useState<string | null>(null);
   const [phase, setPhase] = useState<"ask" | "reply">("ask");
@@ -145,10 +149,9 @@ export function ChatThread() {
 
     try {
       if (phase === "ask") {
-        const result = await askAction(text);
+        const result = await askAction(text, materialId);
         if ("error" in result) {
-          const msg = result.error ?? "Something went wrong.";
-          setError(msg.includes("no indexed materials") ? "no_materials" : msg);
+          setError(result.error ?? "Something went wrong.");
           return;
         }
         const res = result.data;
@@ -165,7 +168,7 @@ export function ChatThread() {
         setCurrentInteractionId(res.interaction_id);
         setPhase("reply");
       } else {
-        const result = await replyAction(currentInteractionId!, text);
+        const result = await replyAction(currentInteractionId!, text, materialId);
         if ("error" in result) {
           setError(result.error ?? "Something went wrong.");
           return;
@@ -207,38 +210,25 @@ export function ChatThread() {
 
   const placeholder =
     phase === "ask"
-      ? "Ask a question about your course materials…"
+      ? `Ask a question about ${materialName}…`
       : "Type your answer to the guided question…";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
+    <div className="flex flex-col h-[calc(100vh-12rem)]">
       {/* Thread */}
       <div className="flex-1 overflow-y-auto space-y-6 pb-4">
         {turns.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-6">
-            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
-              <BrainCircuit className="size-7 text-primary" />
+          <div className="flex flex-col items-center justify-center h-full text-center gap-5 px-4">
+            <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
+              <Sparkles className="size-6 text-primary" />
             </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-semibold text-foreground">Ask about your materials</p>
-              <p className="text-xs text-muted-foreground max-w-sm">
-                Type a topic or concept from your uploaded materials. Gemini won&apos;t give you the answer — it will ask you guided questions to help you work it out yourself.
+            <div className="space-y-1.5 max-w-md">
+              <p className="text-sm font-semibold text-foreground">
+                Ask anything about <span className="text-primary">{materialName}</span>
               </p>
-            </div>
-            <div className="flex flex-col gap-2 w-full max-w-sm">
-              {[
-                "Explain how TCP/IP handshaking works",
-                "What is the difference between a process and a thread?",
-                "How does normalisation reduce data redundancy?",
-              ].map((example) => (
-                <button
-                  key={example}
-                  onClick={() => setInput(example)}
-                  className="rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-left text-xs text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-foreground transition-colors cursor-pointer"
-                >
-                  {example}
-                </button>
-              ))}
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Your guide responds with questions calibrated to your mastery level (recall, application, analysis) instead of direct answers. Reply to each one and your score updates.
+              </p>
             </div>
           </div>
         )}
@@ -264,21 +254,9 @@ export function ChatThread() {
       {/* Error */}
       {error && (
         <div className="pb-3">
-          {error === "no_materials" ? (
-            <Alert variant="destructive">
-              <AlertDescription className="text-xs">
-                You have no indexed materials yet.{" "}
-                <Link href="/materials" className="underline underline-offset-2">
-                  Upload materials
-                </Link>{" "}
-                first.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <Alert variant="destructive">
-              <AlertDescription className="text-xs">{error}</AlertDescription>
-            </Alert>
-          )}
+          <Alert variant="destructive">
+            <AlertDescription className="text-xs">{error}</AlertDescription>
+          </Alert>
         </div>
       )}
 

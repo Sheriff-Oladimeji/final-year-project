@@ -58,3 +58,11 @@ export async function getReadyMaterials(userId: string): Promise<Material[]> {
   const all = await listMaterials(userId);
   return all.filter((m) => m.status === "ready");
 }
+
+export async function getReadyMaterial(
+  id: string,
+  userId: string,
+): Promise<Material | null> {
+  const m = await getMaterial(id, userId);
+  return m && m.status === "ready" ? m : null;
+}

@@ -13,7 +13,11 @@ const links = [
   { href: "/admin/interactions", label: "Interactions", icon: ScrollText },
 ];
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  userEmail: string;
+}
+
+export function AdminSidebar({ userEmail }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -25,10 +29,12 @@ export function AdminSidebar() {
     router.refresh();
   }
 
+  const initial = userEmail.charAt(0).toUpperCase();
+
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-border bg-card sticky top-0">
       {/* Brand */}
-      <div className="flex h-14 items-center gap-2 border-b border-border px-4">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
         <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
           <ShieldCheck className="size-4 text-primary-foreground" />
         </div>
@@ -36,9 +42,9 @@ export function AdminSidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 p-3">
+      <nav className="flex-1 min-h-0 overflow-y-auto space-y-0.5 p-3">
         {links.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+          const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
               key={href}
@@ -67,8 +73,16 @@ export function AdminSidebar() {
         </div>
       </nav>
 
-      {/* Sign out */}
-      <div className="border-t border-border p-3">
+      {/* Footer: user + sign out */}
+      <div className="shrink-0 border-t border-border p-3 space-y-2">
+        <div className="flex items-center gap-2.5 px-3 py-1.5 min-w-0">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-xs font-semibold">
+            {initial}
+          </div>
+          <span className="text-xs text-muted-foreground truncate" title={userEmail}>
+            {userEmail}
+          </span>
+        </div>
         <button
           onClick={handleSignOut}
           disabled={signingOut}

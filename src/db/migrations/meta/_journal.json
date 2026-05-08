@@ -15,6 +15,13 @@
       "when": 1778241351098,
       "tag": "0001_loud_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778255214728,
+      "tag": "0002_fuzzy_bill_hollister",
+      "breakpoints": true
     }
   ]
 }

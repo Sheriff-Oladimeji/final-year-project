@@ -6,6 +6,7 @@ import type { Interaction } from "@/db/schema";
 export async function createInteraction(data: {
   userId: string;
   sessionId?: string;
+  materialId?: string;
   topicId: string;
   question: string;
   retrievedContext: string;

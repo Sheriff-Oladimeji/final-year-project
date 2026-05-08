@@ -107,6 +107,7 @@ export const interactions = pgTable(
     userId:           text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     // BA session ID stored for reference — text, no FK (BA manages session lifecycle)
     sessionId:        text("session_id"),
+    materialId:       uuid("material_id").references(() => materials.id, { onDelete: "set null" }),
     topicId:          uuid("topic_id").notNull().references(() => topics.id),
     question:         text("question").notNull(),
     retrievedContext: text("retrieved_context"),
@@ -120,6 +121,7 @@ export const interactions = pgTable(
   (t) => [
     index("interactions_user_id_idx").on(t.userId),
     index("interactions_topic_id_idx").on(t.topicId),
+    index("interactions_material_id_idx").on(t.materialId),
     index("interactions_created_at_idx").on(t.createdAt),
   ],
 );
