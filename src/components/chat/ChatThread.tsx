@@ -215,15 +215,30 @@ export function ChatThread() {
       {/* Thread */}
       <div className="flex-1 overflow-y-auto space-y-6 pb-4">
         {turns.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+          <div className="flex flex-col items-center justify-center h-full text-center gap-6">
             <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
               <BrainCircuit className="size-7 text-primary" />
             </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Start learning</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                Ask a question about your uploaded course materials and Gemini will guide you to the answer.
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold text-foreground">Ask about your materials</p>
+              <p className="text-xs text-muted-foreground max-w-sm">
+                Type a topic or concept from your uploaded materials. Gemini won&apos;t give you the answer — it will ask you guided questions to help you work it out yourself.
               </p>
+            </div>
+            <div className="flex flex-col gap-2 w-full max-w-sm">
+              {[
+                "Explain how TCP/IP handshaking works",
+                "What is the difference between a process and a thread?",
+                "How does normalisation reduce data redundancy?",
+              ].map((example) => (
+                <button
+                  key={example}
+                  onClick={() => setInput(example)}
+                  className="rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-left text-xs text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-foreground transition-colors cursor-pointer"
+                >
+                  {example}
+                </button>
+              ))}
             </div>
           </div>
         )}
