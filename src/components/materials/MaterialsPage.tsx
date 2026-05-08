@@ -2,13 +2,12 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Video, Trash2, Loader2, CheckCircle, XCircle, Upload } from "lucide-react";
+import { FileText, Video, Trash2, Loader2, CheckCircle, XCircle, Upload, FilePlus2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -87,8 +86,8 @@ export function MaterialsPage({ initialMaterials }: MaterialsPageProps) {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-xl font-semibold">Materials</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <h1 className="text-2xl font-bold tracking-tight">Materials</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Upload PDFs or YouTube videos — Gemini will index them for your chat sessions.
         </p>
       </div>
@@ -96,80 +95,76 @@ export function MaterialsPage({ initialMaterials }: MaterialsPageProps) {
       {/* Upload section */}
       <div className="grid gap-4 sm:grid-cols-2">
         {/* PDF upload */}
-        <Card>
-          <CardContent className="pt-5 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <FileText className="size-4" />
-              Upload PDF
-            </div>
-            <p className="text-xs text-muted-foreground">Max 25 MB. Must be a valid PDF.</p>
-            {pdfError && (
-              <Alert variant="destructive">
-                <AlertDescription className="text-xs">{pdfError}</AlertDescription>
-              </Alert>
+        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <FileText className="size-4 text-primary" />
+            Upload PDF
+          </div>
+          <p className="text-xs text-muted-foreground">Max 25 MB. Must be a valid PDF file.</p>
+          {pdfError && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-xs">{pdfError}</AlertDescription>
+            </Alert>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            id="pdf-input"
+            onChange={handlePdfUpload}
+            disabled={uploadingPdf}
+          />
+          <button
+            type="button"
+            disabled={uploadingPdf}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+          >
+            {uploadingPdf ? (
+              <>
+                <Loader2 className="size-5 animate-spin" />
+                <span>Uploading…</span>
+              </>
+            ) : (
+              <>
+                <FilePlus2 className="size-5" />
+                <span>Click to choose file</span>
+              </>
             )}
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                id="pdf-input"
-                onChange={handlePdfUpload}
-                disabled={uploadingPdf}
-              />
-              <Button
-                asChild={false}
-                variant="outline"
-                size="sm"
-                disabled={uploadingPdf}
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full"
-              >
-                {uploadingPdf ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Uploading…
-                  </>
-                ) : (
-                  <>
-                    <Upload className="size-4" />
-                    Choose file
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          </button>
+        </div>
 
         {/* YouTube */}
-        <Card>
-          <CardContent className="pt-5 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Video className="size-4" />
-              Add YouTube video
-            </div>
-            <p className="text-xs text-muted-foreground">Video must have captions enabled.</p>
-            {youtubeError && (
-              <Alert variant="destructive">
-                <AlertDescription className="text-xs">{youtubeError}</AlertDescription>
-              </Alert>
-            )}
-            <form onSubmit={handleVideoSubmit} className="flex gap-2">
-              <Input
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
-                placeholder="https://youtube.com/watch?v=..."
-                required
-                disabled={submittingVideo}
-                className="text-xs"
-              />
-              <Button size="sm" type="submit" disabled={submittingVideo}>
-                {submittingVideo ? <Loader2 className="size-4 animate-spin" /> : "Add"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Video className="size-4 text-primary" />
+            Add YouTube video
+          </div>
+          <p className="text-xs text-muted-foreground">Video must have captions enabled.</p>
+          {youtubeError && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-xs">{youtubeError}</AlertDescription>
+            </Alert>
+          )}
+          <form onSubmit={handleVideoSubmit} className="space-y-2">
+            <Input
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              placeholder="https://youtube.com/watch?v=..."
+              required
+              disabled={submittingVideo}
+              className="text-xs"
+            />
+            <Button size="sm" type="submit" disabled={submittingVideo} className="w-full">
+              {submittingVideo ? (
+                <><Loader2 className="size-4 animate-spin" /> Adding…</>
+              ) : (
+                <><Upload className="size-4" /> Add video</>
+              )}
+            </Button>
+          </form>
+        </div>
       </div>
 
       {/* Materials list */}
@@ -182,10 +177,10 @@ export function MaterialsPage({ initialMaterials }: MaterialsPageProps) {
         </div>
       ) : (
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground px-1">
             Your materials
-          </Label>
-          <div className="divide-y divide-border rounded-xl border border-border">
+          </p>
+          <div className="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
             {initialMaterials.map((m) => (
               <MaterialRow key={m.id} material={m} onDelete={handleDelete} />
             ))}
@@ -207,14 +202,14 @@ function StatusBadge({ status }: { status: Material["status"] }) {
   }
   if (status === "ready") {
     return (
-      <Badge variant="outline" className="gap-1 text-xs text-green-700 border-green-200 bg-green-50">
+      <Badge variant="outline" className="gap-1 text-xs bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">
         <CheckCircle className="size-3" />
         Ready
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="gap-1 text-xs text-red-700 border-red-200 bg-red-50">
+    <Badge variant="outline" className="gap-1 text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">
       <XCircle className="size-3" />
       Failed
     </Badge>
@@ -239,8 +234,8 @@ function MaterialRow({
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <div className="flex-shrink-0 text-muted-foreground">
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+      <div className="flex-shrink-0 text-primary/60">
         {material.kind === "pdf" ? (
           <FileText className="size-4" />
         ) : (
@@ -254,7 +249,7 @@ function MaterialRow({
       <StatusBadge status={material.status} />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive">
+          <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive cursor-pointer">
             <Trash2 className="size-4" />
           </Button>
         </DialogTrigger>
@@ -266,9 +261,7 @@ function MaterialRow({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
               {deleting ? <Loader2 className="size-4 animate-spin" /> : "Delete"}
             </Button>

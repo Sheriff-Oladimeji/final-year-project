@@ -1,18 +1,14 @@
 import { config } from "dotenv";
 import { join } from "path";
 
-config({ path: join(process.cwd(), ".env.local") });
+config({ path: join(process.cwd(), ".env") });
 
 import { db } from "../src/db";
 import { user } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 
 async function main() {
-  const email = process.env.ADMIN_EMAIL;
-  if (!email) {
-    console.error("ADMIN_EMAIL must be set in .env.local");
-    process.exit(1);
-  }
+  const email = "dimejiademola5@gmail.com";
 
   const existing = await db.select().from(user).where(eq(user.email, email)).limit(1);
   if (existing[0]) {

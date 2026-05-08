@@ -8,7 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   BookOpen,
-  MessageSquare,
+  BrainCircuit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,15 +43,15 @@ type Turn = QuestionTurn | ReplyTurn;
 const CORRECTNESS_STYLES: Record<Correctness, { label: string; className: string }> = {
   correct: {
     label: "Correct",
-    className: "bg-green-100 text-green-700 border-green-200",
+    className: "bg-emerald-100/80 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
   },
   correct_with_hint: {
     label: "Correct with hint",
-    className: "bg-amber-100 text-amber-700 border-amber-200",
+    className: "bg-amber-100/80 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
   },
   incorrect: {
     label: "Incorrect",
-    className: "bg-red-100 text-red-700 border-red-200",
+    className: "bg-red-100/80 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
   },
 };
 
@@ -63,7 +63,7 @@ function CitationsAccordion({ citations }: { citations: Citation[] }) {
   return (
     <div className="mt-2">
       <button
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         onClick={() => setOpen((o) => !o)}
       >
         <BookOpen className="size-3" />
@@ -86,13 +86,13 @@ function CitationsAccordion({ citations }: { citations: Citation[] }) {
 
 function QuestionBubble({ turn }: { turn: QuestionTurn }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-xs capitalize">
+        <Badge variant="outline" className="text-xs capitalize bg-primary/10 text-primary border-primary/20">
           {turn.topic}
         </Badge>
       </div>
-      <div className="rounded-xl rounded-tl-sm bg-muted px-4 py-3 text-sm leading-relaxed max-w-2xl">
+      <div className="rounded-xl rounded-tl-sm border-l-2 border-primary/40 bg-muted px-4 py-3 text-sm leading-relaxed max-w-2xl">
         {turn.content}
       </div>
       <CitationsAccordion citations={turn.citations} />
@@ -104,7 +104,7 @@ function ReplyBubble({ turn }: { turn: ReplyTurn }) {
   const style = CORRECTNESS_STYLES[turn.correctness];
   const deltaSign = turn.scoreDelta >= 0 ? "+" : "";
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-end gap-1.5">
       <div className="rounded-xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-3 text-sm leading-relaxed max-w-2xl">
         {turn.content}
       </div>
@@ -113,8 +113,7 @@ function ReplyBubble({ turn }: { turn: ReplyTurn }) {
           {style.label}
         </Badge>
         <span className="text-xs text-muted-foreground">
-          {deltaSign}
-          {turn.scoreDelta} pts · score {turn.newScore}/100
+          {deltaSign}{turn.scoreDelta} pts · score {turn.newScore}/100
         </span>
       </div>
     </div>
@@ -216,12 +215,14 @@ export function ChatThread() {
       {/* Thread */}
       <div className="flex-1 overflow-y-auto space-y-6 pb-4">
         {turns.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-muted-foreground">
-            <MessageSquare className="size-8 opacity-40" />
+          <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+              <BrainCircuit className="size-7 text-primary" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Start learning</p>
-              <p className="text-xs mt-0.5">
-                Ask a question about your uploaded course materials.
+              <p className="text-sm font-semibold text-foreground">Start learning</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                Ask a question about your uploaded course materials and Gemini will guide you to the answer.
               </p>
             </div>
           </div>
@@ -237,7 +238,7 @@ export function ChatThread() {
 
         {loading && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
+            <Loader2 className="size-3 animate-spin text-primary" />
             {phase === "ask" ? "Generating guided question…" : "Scoring your answer…"}
           </div>
         )}
@@ -267,7 +268,7 @@ export function ChatThread() {
       )}
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="flex gap-2 items-end pt-2 border-t border-border">
+      <form onSubmit={handleSubmit} className="flex gap-2 items-end pt-3 border-t border-border">
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}

@@ -23,14 +23,15 @@ export function Sparkline({ history }: SparklineProps) {
   });
 
   const lastDelta = deltas[deltas.length - 1];
-  const stroke = lastDelta > 0 ? "#22c55e" : lastDelta < 0 ? "#ef4444" : "#94a3b8";
+  const color =
+    lastDelta > 0 ? "#10b981" : lastDelta < 0 ? "#ef4444" : "#94a3b8";
 
   return (
     <svg width={width} height={height} className="overflow-visible">
       <polyline
         points={points.join(" ")}
         fill="none"
-        stroke={stroke}
+        stroke={color}
         strokeWidth={1.5}
         strokeLinejoin="round"
         strokeLinecap="round"
