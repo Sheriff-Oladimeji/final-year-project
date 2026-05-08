@@ -3,16 +3,17 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { StudentNav } from "@/components/nav/StudentNav";
+import { StudentSidebar } from "@/components/nav/StudentSidebar";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !["student", "admin"].includes(session.user.role) || session.user.disabledAt) redirect("/");
+  const role = session?.user.role ?? "";
+  if (!session || !["student", "admin"].includes(role) || session.user.disabledAt) redirect("/");
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <StudentNav />
-      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8">{children}</main>
+    <div className="flex min-h-screen">
+      <StudentSidebar />
+      <main className="flex-1 min-w-0 px-8 py-8">{children}</main>
     </div>
   );
 }

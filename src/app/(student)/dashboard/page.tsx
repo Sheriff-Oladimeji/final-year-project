@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { MessageSquare, BrainCircuit } from "lucide-react";
+import { MessageSquare, BrainCircuit, Library } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listTopicsWithHistory } from "@/db/queries/topics";
 import { TopicCard } from "@/components/dashboard/TopicCard";
@@ -33,12 +33,14 @@ export default async function DashboardPage() {
             Your topic mastery across all course materials
           </p>
         </div>
-        <Button asChild size="sm">
-          <Link href="/chat">
-            <MessageSquare className="size-4" />
-            Ask a question
-          </Link>
-        </Button>
+        {topics.length > 0 && (
+          <Button asChild size="sm">
+            <Link href="/chat">
+              <MessageSquare className="size-4" />
+              Ask a question
+            </Link>
+          </Button>
+        )}
       </div>
 
       {topics.length === 0 ? (
@@ -50,13 +52,13 @@ export default async function DashboardPage() {
             <div className="space-y-1">
               <p className="text-sm font-semibold">No topics yet</p>
               <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                Start a chat session and your mastery scores will appear here as you practise.
+                Upload materials and start a chat session — your mastery scores per topic will appear here.
               </p>
             </div>
             <Button asChild size="sm" className="mt-1">
-              <Link href="/chat">
-                <MessageSquare className="size-4" />
-                Go to Chat
+              <Link href="/materials">
+                <Library className="size-4" />
+                Go to Materials
               </Link>
             </Button>
           </div>

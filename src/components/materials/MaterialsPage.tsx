@@ -2,10 +2,10 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Video, Trash2, Loader2, CheckCircle, XCircle, Upload, FilePlus2 } from "lucide-react";
+import Link from "next/link";
+import { FileText, Video, Trash2, Loader2, CheckCircle, XCircle, Upload, FilePlus2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -247,6 +247,14 @@ function MaterialRow({
         <p className="text-xs text-muted-foreground truncate">{material.source_uri}</p>
       </div>
       <StatusBadge status={material.status} />
+      {material.status === "ready" && (
+        <Button asChild size="sm" variant="outline" className="shrink-0 gap-1.5 text-primary border-primary/30 hover:bg-primary/10 hover:text-primary">
+          <Link href="/chat">
+            <MessageSquare className="size-3.5" />
+            Chat
+          </Link>
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
           <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive cursor-pointer">
