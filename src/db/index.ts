@@ -1,16 +1,16 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { Pool } from "@neondatabase/serverless";
 import * as schema from "./schema";
 
-// Reuse the connection across hot-reloads in dev (Next.js module caching)
-const globalForDb = globalThis as unknown as { _pgClient?: postgres.Sql };
+// Reuse the pool across hot-reloads in dev (Next.js module caching).
+const globalForDb = globalThis as unknown as { _pgPool?: Pool };
 
-const client =
-  globalForDb._pgClient ??
-  postgres(process.env.DATABASE_URL!, { max: 10 });
+const pool =
+  globalForDb._pgPool ??
+  new Pool({ connectionString: process.env.DATABASE_URL! });
 
 if (process.env.NODE_ENV !== "production") {
-  globalForDb._pgClient = client;
+  globalForDb._pgPool = pool;
 }
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(pool, { schema });
