@@ -1,7 +1,9 @@
 import { headers } from "next/headers";
+import { z } from "zod";
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
+  generateObject,
   generateText,
   streamText,
 } from "ai";
@@ -14,6 +16,10 @@ import {
   RETRIEVE_PROMPT,
   TIER_TEMPLATES,
   CLASSIFY_CORRECTNESS_TEMPLATE,
+  INTENT_CLASSIFIER_TEMPLATE,
+  ANSWER_TEMPLATE,
+  META_TEMPLATE,
+  FOLLOWUP_SUGGESTIONS_TEMPLATE,
 } from "@/lib/gemini/prompts";
 import { getReadyMaterial } from "@/db/queries/materials";
 import { getOrCreateTopic, updateMasteryScore } from "@/db/queries/topics";
@@ -29,6 +35,8 @@ import { getMasteryTier, scoreDelta, clipScore } from "@/lib/mastery";
 import type { Citation, Correctness } from "@/types";
 
 export const maxDuration = 60;
+
+type Intent = "new_question" | "answer_attempt" | "give_up" | "meta";
 
 interface ChatRequestBody {
   messages: ChatMessage[];
@@ -50,6 +58,41 @@ function lastUserText(messages: ChatMessage[]): string {
   return "";
 }
 
+async function classifyIntent(
+  userText: string,
+  lastGuidedQuestion: string | null,
+): Promise<Intent> {
+  // Cheap heuristic shortcut for clear give-up phrases — saves a Gemini call.
+  const lowered = userText.toLowerCase().trim();
+  const giveUpPatterns = [
+    /^idk\.?$/,
+    /^i\s*don'?t\s*know/,
+    /^no\s*idea/,
+    /^no\s*clue/,
+    /^just\s*tell\s*me/,
+    /^show\s*me\s*(the)?\s*answer/,
+    /^skip$/,
+    /^pass$/,
+    /^i\s*give\s*up/,
+  ];
+  if (giveUpPatterns.some((re) => re.test(lowered))) return "give_up";
+
+  try {
+    const { text } = await generateText({
+      model: geminiModel,
+      prompt: INTENT_CLASSIFIER_TEMPLATE(userText, lastGuidedQuestion),
+    });
+    const label = text.trim().toLowerCase().split(/\s/)[0] ?? "";
+    if (["new_question", "answer_attempt", "give_up", "meta"].includes(label)) {
+      return label as Intent;
+    }
+  } catch {
+    // fall through
+  }
+  // If classifier fails, use the structural cue: interactionId present → reply.
+  return lastGuidedQuestion ? "answer_attempt" : "new_question";
+}
+
 function parseCorrectness(raw: string): Correctness {
   const label = raw.trim().toLowerCase().split(/\s/)[0] ?? "incorrect";
   return (["correct", "correct_with_hint", "incorrect"].includes(label)
@@ -61,7 +104,6 @@ function parseRetrieved(raw: string): { contextText: string; citations: Citation
   if (raw.includes("NO_RELEVANT_CONTENT")) {
     return { contextText: "No directly relevant material found.", citations: [] };
   }
-
   const citations: Citation[] = [];
   const contextParts: string[] = [];
   let currentSource = "";
@@ -96,58 +138,191 @@ function parseRetrieved(raw: string): { contextText: string; citations: Citation
       citations: [{ source: "course material", excerpt: raw.slice(0, 500) }],
     };
   }
-
   return { contextText: contextParts.join("\n\n"), citations };
 }
 
-export async function POST(req: Request) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.disabledAt) {
-    return new Response("Unauthorised", { status: 401 });
-  }
+const SuggestionsSchema = z.object({ suggestions: z.array(z.string()).length(3) });
 
-  const body = (await req.json()) as ChatRequestBody;
-  const { messages, materialId, interactionId } = body;
-
-  if (!materialId) {
-    return new Response("Missing materialId", { status: 400 });
-  }
-
-  const userText = lastUserText(messages);
-  if (!userText) {
-    return new Response("Empty message", { status: 400 });
-  }
-
-  const userId = session.user.id;
-  const sessionId = session.session.id;
-
-  const material = await getReadyMaterial(materialId, userId);
-  if (!material) {
-    return new Response("Material not ready or not found", { status: 404 });
-  }
-
-  let fileParts: Awaited<ReturnType<typeof buildFileContentParts>>;
+async function generateFollowups(
+  topic: string,
+  tier: string,
+  lastAssistant: string,
+  isGuidedQuestion: boolean,
+): Promise<string[]> {
   try {
-    fileParts = await buildFileContentParts(material);
-  } catch (err) {
-    return new Response(err instanceof Error ? err.message : "File load failed", {
-      status: 500,
+    const { object } = await generateObject({
+      model: geminiModel,
+      schema: SuggestionsSchema,
+      prompt: FOLLOWUP_SUGGESTIONS_TEMPLATE(topic, tier, lastAssistant, isGuidedQuestion),
     });
+    return object.suggestions;
+  } catch {
+    return [];
+  }
+}
+
+export async function POST(req: Request) {
+  // Pre-stream setup. Anything thrown here returns a real HTTP 500 (no stream
+  // protocol involved) so wrap and log everything for diagnosis.
+  let session: Awaited<ReturnType<typeof auth.api.getSession>>;
+  let body: ChatRequestBody;
+  let userText: string;
+  let userId: string;
+  let sessionId: string;
+  let materialId: string;
+  let interactionId: string | undefined;
+  let material: Awaited<ReturnType<typeof getReadyMaterial>>;
+  let fileParts: Awaited<ReturnType<typeof buildFileContentParts>>;
+  let priorInteraction: Awaited<ReturnType<typeof getInteraction>> | null;
+  let intent: Intent;
+
+  try {
+    session = await auth.api.getSession({ headers: await headers() });
+    if (!session || session.user.disabledAt) {
+      return new Response("Unauthorised", { status: 401 });
+    }
+
+    body = (await req.json()) as ChatRequestBody;
+    materialId = body.materialId;
+    interactionId = body.interactionId;
+
+    if (!materialId) return new Response("Missing materialId", { status: 400 });
+    userText = lastUserText(body.messages);
+    if (!userText) return new Response("Empty message", { status: 400 });
+
+    userId = session.user.id;
+    sessionId = session.session.id;
+
+    material = await getReadyMaterial(materialId, userId);
+    if (!material) return new Response("Material not ready or not found", { status: 404 });
+
+    fileParts = await buildFileContentParts(material);
+
+    priorInteraction = interactionId ? await getInteraction(interactionId, userId) : null;
+    const lastGuidedQuestion = priorInteraction?.response ?? null;
+    intent = await classifyIntent(userText, lastGuidedQuestion);
+
+    // Stale interactionId: the prior interaction is already scored. Treat
+    // this as a fresh question rather than throwing.
+    if (
+      intent === "answer_attempt" &&
+      priorInteraction &&
+      priorInteraction.correctness !== "unscored"
+    ) {
+      console.warn(
+        "[/api/chat] answer_attempt against already-scored interaction; reclassifying as new_question",
+        { interactionId, correctness: priorInteraction.correctness },
+      );
+      intent = "new_question";
+      priorInteraction = null;
+    }
+  } catch (err) {
+    console.error("[/api/chat] preflight error", err);
+    const message =
+      err instanceof Error ? `${err.name}: ${err.message}` : "Server error";
+    return new Response(message, { status: 500 });
   }
 
   const stream = createUIMessageStream<ChatMessage>({
     execute: async ({ writer }) => {
-      // ── REPLY PHASE ──────────────────────────────────────────────────────
-      if (interactionId) {
-        const interaction = await getInteraction(interactionId, userId);
-        if (!interaction) throw new Error("Interaction not found");
-        if (interaction.correctness !== "unscored") {
-          throw new Error("This interaction has already been scored.");
-        }
+      // ── META: explain the system; no scoring, no topic data ───────────
+      if (intent === "meta") {
+        const result = streamText({
+          model: geminiModel,
+          prompt: META_TEMPLATE(userText),
+          onFinish: async ({ text }) => {
+            const followups = await generateFollowups("the LearnAI app", "meta", text, false);
+            writer.write({ type: "data-mode", id: "mode", data: { value: "meta" } });
+            if (followups.length) {
+              writer.write({
+                type: "data-suggestions",
+                id: "sugs",
+                data: { items: followups },
+              });
+            }
+          },
+        });
+        writer.merge(result.toUIMessageStream());
+        return;
+      }
 
+      // ── GIVE_UP or ANSWER_ATTEMPT: we need the prior interaction's
+      //    context. If the user gave up at the very start (no prior),
+      //    fall through to ASK to build context first.
+      if (intent === "give_up" && priorInteraction) {
+        const interaction = priorInteraction;
         const contextText = interaction.retrievedContext ?? "";
+        const topicRows = await db
+          .select()
+          .from(topics)
+          .where(eq(topics.id, interaction.topicId));
+        const topic = topicRows[0];
+        const newScore = clipScore(topic.masteryScore + scoreDelta("give_up"));
+        const newTier = getMasteryTier(newScore);
 
-        // Score the answer
+        await Promise.all([
+          updateMasteryScore(interaction.topicId, newScore),
+          updateInteraction(interaction.id, userId, {
+            studentReply: userText,
+            correctness: "give_up" as unknown as Correctness,
+            scoreDelta: scoreDelta("give_up"),
+          }),
+        ]);
+
+        const prompt = ANSWER_TEMPLATE(interaction.question, contextText, topic.name);
+        const result = streamText({
+          model: geminiModel,
+          messages: [
+            { role: "user", content: [{ type: "text", text: prompt }, ...fileParts] },
+          ],
+          onFinish: async ({ text }) => {
+            const next = await createInteraction({
+              userId,
+              sessionId,
+              materialId,
+              topicId: topic.id,
+              question: interaction.question,
+              retrievedContext: contextText,
+              promptTemplate: "answer",
+              response: text,
+            });
+            const followups = await generateFollowups(topic.name, newTier, text, false);
+            writer.write({ type: "data-mode", id: "mode", data: { value: "answer" } });
+            writer.write({
+              type: "data-topic",
+              id: "topic",
+              data: { name: topic.name, mastery_score: newScore, tier: newTier },
+            });
+            writer.write({
+              type: "data-score",
+              id: "score",
+              data: {
+                correctness: "give_up",
+                score_delta: scoreDelta("give_up"),
+                new_score: newScore,
+                new_tier: newTier,
+              },
+            });
+            writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
+            if (followups.length) {
+              writer.write({
+                type: "data-suggestions",
+                id: "sugs",
+                data: { items: followups },
+              });
+            }
+          },
+        });
+        writer.merge(result.toUIMessageStream());
+        return;
+      }
+
+      // ── ANSWER_ATTEMPT: existing reply flow with smarter outputs ──────
+      // Preflight already reclassifies stale (already-scored) answer_attempts
+      // as new_question, so the priorInteraction here is always unscored.
+      if (intent === "answer_attempt" && priorInteraction) {
+        const interaction = priorInteraction;
+        const contextText = interaction.retrievedContext ?? "";
         const correctnessRaw = await generateText({
           model: geminiModel,
           prompt: CLASSIFY_CORRECTNESS_TEMPLATE(
@@ -158,47 +333,30 @@ export async function POST(req: Request) {
           ),
         });
         const correctness = parseCorrectness(correctnessRaw.text);
-
         const delta = scoreDelta(correctness);
+
         const topicRows = await db
           .select()
           .from(topics)
           .where(eq(topics.id, interaction.topicId));
         const topic = topicRows[0];
         const newScore = clipScore(topic.masteryScore + delta);
+        const newTier = getMasteryTier(newScore);
 
         await Promise.all([
           updateMasteryScore(interaction.topicId, newScore),
-          updateInteraction(interactionId, userId, {
+          updateInteraction(interaction.id, userId, {
             studentReply: userText,
             correctness,
             scoreDelta: delta,
           }),
         ]);
 
-        // Emit score data part
-        writer.write({
-          type: "data-score",
-          data: { correctness, score_delta: delta, new_score: newScore },
-        });
-
-        // Emit topic so frontend can render the topic badge
-        writer.write({
-          type: "data-topic",
-          data: { name: topic.name },
-        });
-
-        // Stream the next guided question
-        const nextTier = getMasteryTier(newScore);
-        const prompt = TIER_TEMPLATES[nextTier](interaction.question, contextText, topic.name);
-
+        const prompt = TIER_TEMPLATES[newTier](interaction.question, contextText, topic.name);
         const result = streamText({
           model: geminiModel,
           messages: [
-            {
-              role: "user",
-              content: [{ type: "text", text: prompt }, ...fileParts],
-            },
+            { role: "user", content: [{ type: "text", text: prompt }, ...fileParts] },
           ],
           onFinish: async ({ text }) => {
             const next = await createInteraction({
@@ -208,21 +366,36 @@ export async function POST(req: Request) {
               topicId: topic.id,
               question: interaction.question,
               retrievedContext: contextText,
-              promptTemplate: nextTier,
+              promptTemplate: newTier,
               response: text,
             });
+            const followups = await generateFollowups(topic.name, newTier, text, true);
+            writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
             writer.write({
-              type: "data-interaction",
-              data: { id: next.id },
+              type: "data-topic",
+              id: "topic",
+              data: { name: topic.name, mastery_score: newScore, tier: newTier },
             });
+            writer.write({
+              type: "data-score",
+              id: "score",
+              data: { correctness, score_delta: delta, new_score: newScore, new_tier: newTier },
+            });
+            writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
+            if (followups.length) {
+              writer.write({
+                type: "data-suggestions",
+                id: "sugs",
+                data: { items: followups },
+              });
+            }
           },
         });
-
         writer.merge(result.toUIMessageStream());
         return;
       }
 
-      // ── ASK PHASE ────────────────────────────────────────────────────────
+      // ── ASK (new_question, OR give_up with no prior context) ──────────
       const [topicGen, retrievedGen] = await Promise.all([
         generateText({
           model: geminiModel,
@@ -256,19 +429,12 @@ export async function POST(req: Request) {
       const { contextText, citations } = parseRetrieved(retrievedGen.text);
       const topic = await getOrCreateTopic(userId, topicLabel);
       const tier = getMasteryTier(topic.masteryScore);
-
-      // Emit topic + citations early so the UI can render them while text streams
-      writer.write({ type: "data-topic", data: { name: topicLabel } });
-      writer.write({ type: "data-citations", data: { items: citations } });
-
       const prompt = TIER_TEMPLATES[tier](userText, contextText, topicLabel);
+
       const result = streamText({
         model: geminiModel,
         messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: prompt }, ...fileParts],
-          },
+          { role: "user", content: [{ type: "text", text: prompt }, ...fileParts] },
         ],
         onFinish: async ({ text }) => {
           const interaction = await createInteraction({
@@ -281,13 +447,28 @@ export async function POST(req: Request) {
             promptTemplate: tier,
             response: text,
           });
+          const followups = await generateFollowups(topicLabel, tier, text, true);
+          writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
           writer.write({
-            type: "data-interaction",
-            data: { id: interaction.id },
+            type: "data-topic",
+            id: "topic",
+            data: { name: topicLabel, mastery_score: topic.masteryScore, tier },
           });
+          writer.write({
+            type: "data-citations",
+            id: "citations",
+            data: { items: citations },
+          });
+          writer.write({ type: "data-interaction", id: "interaction", data: { id: interaction.id } });
+          if (followups.length) {
+            writer.write({
+              type: "data-suggestions",
+              id: "sugs",
+              data: { items: followups },
+            });
+          }
         },
       });
-
       writer.merge(result.toUIMessageStream());
     },
     onError: (error) => {

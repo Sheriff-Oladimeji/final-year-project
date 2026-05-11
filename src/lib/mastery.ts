@@ -4,6 +4,7 @@ const DELTAS: Record<string, number> = {
   correct: 15,
   correct_with_hint: 5,
   incorrect: -10,
+  give_up: -5,
   unscored: 0,
 };
 

@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { interactions } from "@/db/schema";
 import type { Interaction } from "@/db/schema";
@@ -49,6 +49,20 @@ export async function listInteractionsByTopic(
     .from(interactions)
     .where(and(eq(interactions.topicId, topicId), eq(interactions.userId, userId)))
     .orderBy(desc(interactions.createdAt))
+    .limit(limit);
+}
+
+// History for a single material — chronological, used to seed useChat on page load.
+export async function listInteractionsByMaterial(
+  userId: string,
+  materialId: string,
+  limit = 200,
+): Promise<Interaction[]> {
+  return db
+    .select()
+    .from(interactions)
+    .where(and(eq(interactions.userId, userId), eq(interactions.materialId, materialId)))
+    .orderBy(asc(interactions.createdAt))
     .limit(limit);
 }
 
