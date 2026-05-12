@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { Library, BookOpen, BrainCircuit } from "lucide-react";
+import { Library, BookOpen, BrainCircuit, FileText, Video } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listTopicsWithHistory } from "@/db/queries/topics";
 import { listMaterials } from "@/db/queries/materials";
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
 
   const topics: Topic[] = rawTopics.map((t) => ({
     id: t.id,
+    material_id: t.materialId,
     name: t.name,
     mastery_score: t.masteryScore,
     updated_at: t.updatedAt.toISOString(),
@@ -46,20 +48,36 @@ export default async function DashboardPage() {
   const hasReady = readyMaterials.length > 0;
   const hasTopics = topics.length > 0;
 
+  // Group topics by material so each material gets its own card section.
+  const topicsByMaterial = new Map<string, Topic[]>();
+  for (const t of topics) {
+    const list = topicsByMaterial.get(t.material_id) ?? [];
+    list.push(t);
+    topicsByMaterial.set(t.material_id, list);
+  }
+  // Order: materials that have topics first (most recently updated), then by createdAt.
+  const groupedMaterials = materials
+    .filter((m) => topicsByMaterial.has(m.id))
+    .sort((a, b) => {
+      const at = topicsByMaterial.get(a.id) ?? [];
+      const bt = topicsByMaterial.get(b.id) ?? [];
+      const aLatest = Math.max(...at.map((t) => new Date(t.updated_at).getTime()));
+      const bLatest = Math.max(...bt.map((t) => new Date(t.updated_at).getTime()));
+      return bLatest - aLatest;
+    });
+
   return (
     <div className="space-y-8 max-w-6xl">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Your topic mastery and recent course materials
+            Your topic mastery, grouped by material
           </p>
         </div>
         <AddMaterialDialog />
       </div>
 
-      {/* Body */}
       {!hasMaterials ? (
         <EmptyState
           icon={<Library className="size-7 text-primary" />}
@@ -83,9 +101,7 @@ export default async function DashboardPage() {
                 <BrainCircuit className="size-7 text-primary" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-semibold">
-                  Ready to start
-                </p>
+                <p className="text-sm font-semibold">Ready to start</p>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                   Open a material on the right to start a chat. Your mastery scores will appear here.
                 </p>
@@ -98,10 +114,34 @@ export default async function DashboardPage() {
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 grid gap-4 sm:grid-cols-2">
-            {topics.map((topic) => (
-              <TopicCard key={topic.id} topic={topic} />
-            ))}
+          <div className="lg:col-span-2 space-y-8">
+            {groupedMaterials.map((material) => {
+              const materialTopics = topicsByMaterial.get(material.id) ?? [];
+              return (
+                <section key={material.id}>
+                  <Link
+                    href={`/materials/${material.id}`}
+                    className="group flex items-center gap-2 mb-3 hover:text-primary transition-colors"
+                  >
+                    <div className="text-primary/70 group-hover:text-primary">
+                      {material.kind === "pdf" ? (
+                        <FileText className="size-4" />
+                      ) : (
+                        <Video className="size-4" />
+                      )}
+                    </div>
+                    <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors truncate">
+                      {material.display_name}
+                    </h2>
+                  </Link>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {materialTopics.map((topic) => (
+                      <TopicCard key={topic.id} topic={topic} />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
           <div className="lg:col-span-1">
             <RecentMaterialsList materials={materials} />

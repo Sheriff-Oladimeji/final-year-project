@@ -92,13 +92,17 @@ export const topics = pgTable(
   {
     id:           uuid("id").primaryKey().defaultRandom(),
     userId:       text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    // Topics are scoped per material: the same topic name (e.g. "threading")
+    // in two different materials maintains separate mastery tracking.
+    materialId:   uuid("material_id").notNull().references(() => materials.id, { onDelete: "cascade" }),
     name:         varchar("name", { length: 255 }).notNull(),
     masteryScore: integer("mastery_score").notNull().default(0),
     updatedAt:    timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_topics_user_name").on(t.userId, t.name),
+    uniqueIndex("uq_topics_user_material_name").on(t.userId, t.materialId, t.name),
     index("topics_user_id_idx").on(t.userId),
+    index("topics_material_id_idx").on(t.materialId),
   ],
 );
 

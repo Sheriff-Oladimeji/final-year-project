@@ -5,29 +5,44 @@ import type { Topic } from "@/db/schema";
 import { getMasteryTier } from "@/lib/mastery";
 import type { ScoreHistoryEntry, Tier } from "@/types";
 
-export async function getOrCreateTopic(userId: string, name: string): Promise<Topic> {
-  // Try to find existing topic first
+export async function getOrCreateTopic(
+  userId: string,
+  materialId: string,
+  name: string,
+): Promise<Topic> {
+  // Topics are scoped per (user, material, name).
   const existing = await db
     .select()
     .from(topics)
-    .where(and(eq(topics.userId, userId), eq(topics.name, name)))
+    .where(
+      and(
+        eq(topics.userId, userId),
+        eq(topics.materialId, materialId),
+        eq(topics.name, name),
+      ),
+    )
     .limit(1);
 
   if (existing[0]) return existing[0];
 
-  // Insert, ignoring conflict on (userId, name) in case of a race condition
   const rows = await db
     .insert(topics)
-    .values({ userId, name })
+    .values({ userId, materialId, name })
     .onConflictDoNothing()
     .returning();
 
-  // If rows is empty, the concurrent insert won — re-fetch
   if (rows.length === 0) {
+    // Concurrent insert won the race — re-fetch.
     const fetched = await db
       .select()
       .from(topics)
-      .where(and(eq(topics.userId, userId), eq(topics.name, name)))
+      .where(
+        and(
+          eq(topics.userId, userId),
+          eq(topics.materialId, materialId),
+          eq(topics.name, name),
+        ),
+      )
       .limit(1);
     return fetched[0];
   }
@@ -46,6 +61,7 @@ export async function updateMasteryScore(topicId: string, newScore: number): Pro
 
 export interface TopicWithHistory {
   id: string;
+  materialId: string;
   name: string;
   masteryScore: number;
   updatedAt: Date;
@@ -73,17 +89,13 @@ export async function listTopicsWithHistory(
         correctness: interactions.correctness,
       })
       .from(interactions)
-      .where(
-        and(
-          eq(interactions.topicId, topic.id),
-          // Only scored interactions have meaningful deltas
-        ),
-      )
+      .where(eq(interactions.topicId, topic.id))
       .orderBy(desc(interactions.createdAt))
       .limit(historyLimit);
 
     result.push({
       id: topic.id,
+      materialId: topic.materialId,
       name: topic.name,
       masteryScore: topic.masteryScore,
       updatedAt: topic.updatedAt,

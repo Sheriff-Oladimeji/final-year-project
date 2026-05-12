@@ -427,7 +427,7 @@ export async function POST(req: Request) {
       if (topicLabel.length > 100) topicLabel = topicLabel.slice(0, 100);
 
       const { contextText, citations } = parseRetrieved(retrievedGen.text);
-      const topic = await getOrCreateTopic(userId, topicLabel);
+      const topic = await getOrCreateTopic(userId, materialId, topicLabel);
       const tier = getMasteryTier(topic.masteryScore);
       const prompt = TIER_TEMPLATES[tier](userText, contextText, topicLabel);
 

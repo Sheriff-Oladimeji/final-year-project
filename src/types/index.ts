@@ -58,6 +58,7 @@ export interface ScoreHistoryEntry {
 
 export interface Topic {
   id: string;
+  material_id: string;
   name: string;
   mastery_score: number;
   updated_at: string;
