@@ -10,6 +10,7 @@ import {
 import { auth } from "@/lib/auth";
 import { geminiModel } from "@/lib/ai/model";
 import { buildFileContentParts } from "@/lib/ai/file-parts";
+import { buildConversationContext } from "@/lib/ai/conversation";
 import type { ChatMessage } from "@/lib/ai/chat-types";
 import {
   CLASSIFY_TOPIC_TEMPLATE,
@@ -22,11 +23,12 @@ import {
   FOLLOWUP_SUGGESTIONS_TEMPLATE,
 } from "@/lib/gemini/prompts";
 import { getReadyMaterial } from "@/db/queries/materials";
-import { getOrCreateTopic, updateMasteryScore } from "@/db/queries/topics";
+import { getOrCreateTopic, updateMasteryScore, listMaterialTopicNames } from "@/db/queries/topics";
 import {
   createInteraction,
   updateInteraction,
   getInteraction,
+  listInteractionsByMaterial,
 } from "@/db/queries/interactions";
 import { db } from "@/db";
 import { topics } from "@/db/schema";
@@ -175,6 +177,7 @@ export async function POST(req: Request) {
   let fileParts: Awaited<ReturnType<typeof buildFileContentParts>>;
   let priorInteraction: Awaited<ReturnType<typeof getInteraction>> | null;
   let intent: Intent;
+  let conversation = "";
 
   try {
     session = await auth.api.getSession({ headers: await headers() });
@@ -200,6 +203,12 @@ export async function POST(req: Request) {
 
     priorInteraction = interactionId ? await getInteraction(interactionId, userId) : null;
     const lastGuidedQuestion = priorInteraction?.response ?? null;
+
+    // Load recent chat history for this material so the model has memory of
+    // what's already been covered. Used inside all tier prompts.
+    const recentInteractions = await listInteractionsByMaterial(userId, materialId, 12);
+    conversation = buildConversationContext(recentInteractions, 6);
+
     intent = await classifyIntent(userText, lastGuidedQuestion);
 
     // Stale interactionId: the prior interaction is already scored. Treat
@@ -352,7 +361,12 @@ export async function POST(req: Request) {
           }),
         ]);
 
-        const prompt = TIER_TEMPLATES[newTier](interaction.question, contextText, topic.name);
+        const prompt = TIER_TEMPLATES[newTier](
+          interaction.question,
+          contextText,
+          topic.name,
+          conversation,
+        );
         const result = streamText({
           model: geminiModel,
           messages: [
@@ -396,6 +410,7 @@ export async function POST(req: Request) {
       }
 
       // ── ASK (new_question, OR give_up with no prior context) ──────────
+      const recentTopics = await listMaterialTopicNames(userId, materialId);
       const [topicGen, retrievedGen] = await Promise.all([
         generateText({
           model: geminiModel,
@@ -403,7 +418,7 @@ export async function POST(req: Request) {
             {
               role: "user",
               content: [
-                { type: "text", text: CLASSIFY_TOPIC_TEMPLATE(userText) },
+                { type: "text", text: CLASSIFY_TOPIC_TEMPLATE(userText, recentTopics) },
                 ...fileParts,
               ],
             },
@@ -429,7 +444,7 @@ export async function POST(req: Request) {
       const { contextText, citations } = parseRetrieved(retrievedGen.text);
       const topic = await getOrCreateTopic(userId, materialId, topicLabel);
       const tier = getMasteryTier(topic.masteryScore);
-      const prompt = TIER_TEMPLATES[tier](userText, contextText, topicLabel);
+      const prompt = TIER_TEMPLATES[tier](userText, contextText, topicLabel, conversation);
 
       const result = streamText({
         model: geminiModel,

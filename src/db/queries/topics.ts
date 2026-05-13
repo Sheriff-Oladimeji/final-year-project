@@ -50,6 +50,18 @@ export async function getOrCreateTopic(
   return rows[0];
 }
 
+export async function listMaterialTopicNames(
+  userId: string,
+  materialId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ name: topics.name })
+    .from(topics)
+    .where(and(eq(topics.userId, userId), eq(topics.materialId, materialId)))
+    .orderBy(desc(topics.updatedAt));
+  return rows.map((r) => r.name);
+}
+
 export async function updateMasteryScore(topicId: string, newScore: number): Promise<Topic> {
   const rows = await db
     .update(topics)
