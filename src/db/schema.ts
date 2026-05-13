@@ -23,7 +23,6 @@ export const user = pgTable("user", {
   image:         text("image"),
   createdAt:     timestamp("created_at").notNull(),
   updatedAt:     timestamp("updated_at").notNull(),
-  // Custom app fields — declared here AND in auth.ts additionalFields
   role:          text("role").notNull().default("student"),
   isAdmin:       boolean("is_admin").notNull().default(false),
   disabledAt:    timestamp("disabled_at"),
@@ -66,13 +65,26 @@ export const verification = pgTable("verification", {
 });
 
 // ── Application tables ────────────────────────────────────────────────────────
-// userId is text (not uuid) to match Better Auth's user.id format.
+
+// A notebook is a container for up to 5 materials. Chat is scoped per notebook.
+export const notebooks = pgTable(
+  "notebooks",
+  {
+    id:        uuid("id").primaryKey().defaultRandom(),
+    userId:    text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    title:     varchar("title", { length: 255 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("notebooks_user_id_idx").on(t.userId)],
+);
 
 export const materials = pgTable(
   "materials",
   {
     id:           uuid("id").primaryKey().defaultRandom(),
     userId:       text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    notebookId:   uuid("notebook_id").notNull().references(() => notebooks.id, { onDelete: "cascade" }),
     kind:         varchar("kind", { length: 20 }).notNull(),
     displayName:  varchar("display_name", { length: 500 }).notNull(),
     sourceUri:    text("source_uri").notNull(),
@@ -84,25 +96,28 @@ export const materials = pgTable(
     content:      text("content"),
     suggestions:  text("suggestions").array().notNull().default(sql`ARRAY[]::text[]`),
   },
-  (t) => [index("materials_user_id_idx").on(t.userId)],
+  (t) => [
+    index("materials_user_id_idx").on(t.userId),
+    index("materials_notebook_id_idx").on(t.notebookId),
+  ],
 );
 
+// Topics are scoped per (user, notebook). Same name in different notebooks
+// keeps separate mastery scores.
 export const topics = pgTable(
   "topics",
   {
     id:           uuid("id").primaryKey().defaultRandom(),
     userId:       text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    // Topics are scoped per material: the same topic name (e.g. "threading")
-    // in two different materials maintains separate mastery tracking.
-    materialId:   uuid("material_id").notNull().references(() => materials.id, { onDelete: "cascade" }),
+    notebookId:   uuid("notebook_id").notNull().references(() => notebooks.id, { onDelete: "cascade" }),
     name:         varchar("name", { length: 255 }).notNull(),
     masteryScore: integer("mastery_score").notNull().default(0),
     updatedAt:    timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_topics_user_material_name").on(t.userId, t.materialId, t.name),
+    uniqueIndex("uq_topics_user_notebook_name").on(t.userId, t.notebookId, t.name),
     index("topics_user_id_idx").on(t.userId),
-    index("topics_material_id_idx").on(t.materialId),
+    index("topics_notebook_id_idx").on(t.notebookId),
   ],
 );
 
@@ -111,9 +126,8 @@ export const interactions = pgTable(
   {
     id:               uuid("id").primaryKey().defaultRandom(),
     userId:           text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    // BA session ID stored for reference — text, no FK (BA manages session lifecycle)
     sessionId:        text("session_id"),
-    materialId:       uuid("material_id").references(() => materials.id, { onDelete: "set null" }),
+    notebookId:       uuid("notebook_id").notNull().references(() => notebooks.id, { onDelete: "cascade" }),
     topicId:          uuid("topic_id").notNull().references(() => topics.id),
     question:         text("question").notNull(),
     retrievedContext: text("retrieved_context"),
@@ -127,7 +141,7 @@ export const interactions = pgTable(
   (t) => [
     index("interactions_user_id_idx").on(t.userId),
     index("interactions_topic_id_idx").on(t.topicId),
-    index("interactions_material_id_idx").on(t.materialId),
+    index("interactions_notebook_id_idx").on(t.notebookId),
     index("interactions_created_at_idx").on(t.createdAt),
   ],
 );
@@ -135,6 +149,7 @@ export const interactions = pgTable(
 // Type exports
 export type User        = typeof user.$inferSelect;
 export type Session     = typeof session.$inferSelect;
+export type Notebook    = typeof notebooks.$inferSelect;
 export type Material    = typeof materials.$inferSelect;
 export type Topic       = typeof topics.$inferSelect;
 export type Interaction = typeof interactions.$inferSelect;

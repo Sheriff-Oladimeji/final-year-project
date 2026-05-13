@@ -18,10 +18,18 @@ import {
 import { uploadPdfAction, submitYoutubeAction } from "@/actions/materials";
 
 interface AddMaterialDialogProps {
+  notebookId: string;
   trigger?: React.ReactNode;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
-export function AddMaterialDialog({ trigger }: AddMaterialDialogProps) {
+export function AddMaterialDialog({
+  notebookId,
+  trigger,
+  disabled,
+  disabledReason,
+}: AddMaterialDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
@@ -39,6 +47,7 @@ export function AddMaterialDialog({ trigger }: AddMaterialDialogProps) {
   }
 
   function handleOpenChange(next: boolean) {
+    if (disabled) return;
     if (!uploadingPdf && !submittingVideo) {
       setOpen(next);
       if (!next) reset();
@@ -53,6 +62,7 @@ export function AddMaterialDialog({ trigger }: AddMaterialDialogProps) {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("notebookId", notebookId);
       const result = await uploadPdfAction(formData);
       if ("error" in result) {
         setPdfError(result.error ?? "Upload failed.");
@@ -76,6 +86,7 @@ export function AddMaterialDialog({ trigger }: AddMaterialDialogProps) {
     try {
       const formData = new FormData();
       formData.append("url", youtubeUrl);
+      formData.append("notebookId", notebookId);
       const result = await submitYoutubeAction(formData);
       if ("error" in result) {
         setYoutubeError(result.error ?? "Failed to add video.");
@@ -95,17 +106,22 @@ export function AddMaterialDialog({ trigger }: AddMaterialDialogProps) {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm" className="gap-1.5">
+          <Button
+            size="sm"
+            className="gap-1.5"
+            disabled={disabled}
+            title={disabled ? disabledReason : undefined}
+          >
             <Plus className="size-4" />
-            Add material
+            Add source
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add new material</DialogTitle>
+          <DialogTitle>Add new source</DialogTitle>
           <DialogDescription>
-            Upload a PDF or add a YouTube video. Gemini will index it for your chat sessions.
+            Upload a PDF or add a YouTube video. Gemini will index it for your notebook.
           </DialogDescription>
         </DialogHeader>
 

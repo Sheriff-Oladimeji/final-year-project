@@ -15,20 +15,25 @@ import type { ChatMessage } from "@/lib/ai/chat-types";
 import {
   CLASSIFY_TOPIC_TEMPLATE,
   RETRIEVE_PROMPT,
-  TIER_TEMPLATES,
-  CLASSIFY_CORRECTNESS_TEMPLATE,
+  DIRECT_ANSWER_TEMPLATE,
+  REVEAL_TEMPLATE,
+  CLASSIFY_CHECK_TEMPLATE,
   INTENT_CLASSIFIER_TEMPLATE,
-  ANSWER_TEMPLATE,
   META_TEMPLATE,
   FOLLOWUP_SUGGESTIONS_TEMPLATE,
 } from "@/lib/gemini/prompts";
-import { getReadyMaterial } from "@/db/queries/materials";
-import { getOrCreateTopic, updateMasteryScore, listMaterialTopicNames } from "@/db/queries/topics";
+import { getNotebook, touchNotebook } from "@/db/queries/notebooks";
+import { listReadyMaterialsInNotebook } from "@/db/queries/materials";
+import {
+  getOrCreateTopic,
+  updateMasteryScore,
+  listNotebookTopicNames,
+} from "@/db/queries/topics";
 import {
   createInteraction,
   updateInteraction,
   getInteraction,
-  listInteractionsByMaterial,
+  listInteractionsByNotebook,
 } from "@/db/queries/interactions";
 import { db } from "@/db";
 import { topics } from "@/db/schema";
@@ -42,7 +47,7 @@ type Intent = "new_question" | "answer_attempt" | "give_up" | "meta";
 
 interface ChatRequestBody {
   messages: ChatMessage[];
-  materialId: string;
+  notebookId: string;
   interactionId?: string;
 }
 
@@ -64,7 +69,6 @@ async function classifyIntent(
   userText: string,
   lastGuidedQuestion: string | null,
 ): Promise<Intent> {
-  // Cheap heuristic shortcut for clear give-up phrases — saves a Gemini call.
   const lowered = userText.toLowerCase().trim();
   const giveUpPatterns = [
     /^idk\.?$/,
@@ -91,7 +95,6 @@ async function classifyIntent(
   } catch {
     // fall through
   }
-  // If classifier fails, use the structural cue: interactionId present → reply.
   return lastGuidedQuestion ? "answer_attempt" : "new_question";
 }
 
@@ -149,13 +152,13 @@ async function generateFollowups(
   topic: string,
   tier: string,
   lastAssistant: string,
-  isGuidedQuestion: boolean,
+  endsWithCheck: boolean,
 ): Promise<string[]> {
   try {
     const { object } = await generateObject({
       model: geminiModel,
       schema: SuggestionsSchema,
-      prompt: FOLLOWUP_SUGGESTIONS_TEMPLATE(topic, tier, lastAssistant, isGuidedQuestion),
+      prompt: FOLLOWUP_SUGGESTIONS_TEMPLATE(topic, tier, lastAssistant, endsWithCheck),
     });
     return object.suggestions;
   } catch {
@@ -164,16 +167,14 @@ async function generateFollowups(
 }
 
 export async function POST(req: Request) {
-  // Pre-stream setup. Anything thrown here returns a real HTTP 500 (no stream
-  // protocol involved) so wrap and log everything for diagnosis.
   let session: Awaited<ReturnType<typeof auth.api.getSession>>;
   let body: ChatRequestBody;
   let userText: string;
   let userId: string;
   let sessionId: string;
-  let materialId: string;
+  let notebookId: string;
   let interactionId: string | undefined;
-  let material: Awaited<ReturnType<typeof getReadyMaterial>>;
+  let notebookTitle: string;
   let fileParts: Awaited<ReturnType<typeof buildFileContentParts>>;
   let priorInteraction: Awaited<ReturnType<typeof getInteraction>> | null;
   let intent: Intent;
@@ -186,55 +187,54 @@ export async function POST(req: Request) {
     }
 
     body = (await req.json()) as ChatRequestBody;
-    materialId = body.materialId;
+    notebookId = body.notebookId;
     interactionId = body.interactionId;
 
-    if (!materialId) return new Response("Missing materialId", { status: 400 });
+    if (!notebookId) return new Response("Missing notebookId", { status: 400 });
     userText = lastUserText(body.messages);
     if (!userText) return new Response("Empty message", { status: 400 });
 
     userId = session.user.id;
     sessionId = session.session.id;
 
-    material = await getReadyMaterial(materialId, userId);
-    if (!material) return new Response("Material not ready or not found", { status: 404 });
+    const notebook = await getNotebook(notebookId, userId);
+    if (!notebook) return new Response("Notebook not found", { status: 404 });
+    notebookTitle = notebook.title;
 
-    fileParts = await buildFileContentParts(material);
+    const materials = await listReadyMaterialsInNotebook(userId, notebookId);
+    if (materials.length === 0) {
+      return new Response(
+        "This notebook has no ready sources yet. Add at least one PDF or YouTube link first.",
+        { status: 400 },
+      );
+    }
+    fileParts = await buildFileContentParts(materials);
 
     priorInteraction = interactionId ? await getInteraction(interactionId, userId) : null;
     const lastGuidedQuestion = priorInteraction?.response ?? null;
 
-    // Load recent chat history for this material so the model has memory of
-    // what's already been covered. Used inside all tier prompts.
-    const recentInteractions = await listInteractionsByMaterial(userId, materialId, 12);
+    const recentInteractions = await listInteractionsByNotebook(userId, notebookId, 12);
     conversation = buildConversationContext(recentInteractions, 6);
 
     intent = await classifyIntent(userText, lastGuidedQuestion);
 
-    // Stale interactionId: the prior interaction is already scored. Treat
-    // this as a fresh question rather than throwing.
     if (
       intent === "answer_attempt" &&
       priorInteraction &&
       priorInteraction.correctness !== "unscored"
     ) {
-      console.warn(
-        "[/api/chat] answer_attempt against already-scored interaction; reclassifying as new_question",
-        { interactionId, correctness: priorInteraction.correctness },
-      );
       intent = "new_question";
       priorInteraction = null;
     }
   } catch (err) {
     console.error("[/api/chat] preflight error", err);
-    const message =
-      err instanceof Error ? `${err.name}: ${err.message}` : "Server error";
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : "Server error";
     return new Response(message, { status: 500 });
   }
 
   const stream = createUIMessageStream<ChatMessage>({
     execute: async ({ writer }) => {
-      // ── META: explain the system; no scoring, no topic data ───────────
+      // ── META ─────────────────────────────────────────────────────────────
       if (intent === "meta") {
         const result = streamText({
           model: geminiModel,
@@ -255,9 +255,7 @@ export async function POST(req: Request) {
         return;
       }
 
-      // ── GIVE_UP or ANSWER_ATTEMPT: we need the prior interaction's
-      //    context. If the user gave up at the very start (no prior),
-      //    fall through to ASK to build context first.
+      // ── GIVE_UP: reveal the check's answer, score -5, ask a new check ────
       if (intent === "give_up" && priorInteraction) {
         const interaction = priorInteraction;
         const contextText = interaction.retrievedContext ?? "";
@@ -278,7 +276,7 @@ export async function POST(req: Request) {
           }),
         ]);
 
-        const prompt = ANSWER_TEMPLATE(interaction.question, contextText, topic.name);
+        const prompt = REVEAL_TEMPLATE(interaction.response, contextText, topic.name, notebookTitle);
         const result = streamText({
           model: geminiModel,
           messages: [
@@ -288,14 +286,15 @@ export async function POST(req: Request) {
             const next = await createInteraction({
               userId,
               sessionId,
-              materialId,
+              notebookId,
               topicId: topic.id,
               question: interaction.question,
               retrievedContext: contextText,
-              promptTemplate: "answer",
+              promptTemplate: "reveal",
               response: text,
             });
-            const followups = await generateFollowups(topic.name, newTier, text, false);
+            await touchNotebook(notebookId, userId);
+            const followups = await generateFollowups(topic.name, newTier, text, true);
             writer.write({ type: "data-mode", id: "mode", data: { value: "answer" } });
             writer.write({
               type: "data-topic",
@@ -326,20 +325,14 @@ export async function POST(req: Request) {
         return;
       }
 
-      // ── ANSWER_ATTEMPT: existing reply flow with smarter outputs ──────
-      // Preflight already reclassifies stale (already-scored) answer_attempts
-      // as new_question, so the priorInteraction here is always unscored.
+      // ── ANSWER_ATTEMPT: score the check, then next answer + new check ────
       if (intent === "answer_attempt" && priorInteraction) {
         const interaction = priorInteraction;
         const contextText = interaction.retrievedContext ?? "";
+
         const correctnessRaw = await generateText({
           model: geminiModel,
-          prompt: CLASSIFY_CORRECTNESS_TEMPLATE(
-            interaction.response,
-            contextText,
-            userText,
-            false,
-          ),
+          prompt: CLASSIFY_CHECK_TEMPLATE(interaction.response, contextText, userText),
         });
         const correctness = parseCorrectness(correctnessRaw.text);
         const delta = scoreDelta(correctness);
@@ -361,11 +354,14 @@ export async function POST(req: Request) {
           }),
         ]);
 
-        const prompt = TIER_TEMPLATES[newTier](
+        // For the next turn, treat the original question as the topic anchor
+        // and emit a fresh direct answer + new check.
+        const prompt = DIRECT_ANSWER_TEMPLATE(
           interaction.question,
           contextText,
           topic.name,
           conversation,
+          notebookTitle,
         );
         const result = streamText({
           model: geminiModel,
@@ -376,13 +372,14 @@ export async function POST(req: Request) {
             const next = await createInteraction({
               userId,
               sessionId,
-              materialId,
+              notebookId,
               topicId: topic.id,
               question: interaction.question,
               retrievedContext: contextText,
-              promptTemplate: newTier,
+              promptTemplate: "answer",
               response: text,
             });
+            await touchNotebook(notebookId, userId);
             const followups = await generateFollowups(topic.name, newTier, text, true);
             writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
             writer.write({
@@ -409,8 +406,8 @@ export async function POST(req: Request) {
         return;
       }
 
-      // ── ASK (new_question, OR give_up with no prior context) ──────────
-      const recentTopics = await listMaterialTopicNames(userId, materialId);
+      // ── NEW_QUESTION (or give_up with no prior interaction) ─────────────
+      const recentTopics = await listNotebookTopicNames(userId, notebookId);
       const [topicGen, retrievedGen] = await Promise.all([
         generateText({
           model: geminiModel,
@@ -442,9 +439,15 @@ export async function POST(req: Request) {
       if (topicLabel.length > 100) topicLabel = topicLabel.slice(0, 100);
 
       const { contextText, citations } = parseRetrieved(retrievedGen.text);
-      const topic = await getOrCreateTopic(userId, materialId, topicLabel);
+      const topic = await getOrCreateTopic(userId, notebookId, topicLabel);
       const tier = getMasteryTier(topic.masteryScore);
-      const prompt = TIER_TEMPLATES[tier](userText, contextText, topicLabel, conversation);
+      const prompt = DIRECT_ANSWER_TEMPLATE(
+        userText,
+        contextText,
+        topicLabel,
+        conversation,
+        notebookTitle,
+      );
 
       const result = streamText({
         model: geminiModel,
@@ -455,13 +458,14 @@ export async function POST(req: Request) {
           const interaction = await createInteraction({
             userId,
             sessionId,
-            materialId,
+            notebookId,
             topicId: topic.id,
             question: userText,
             retrievedContext: contextText,
-            promptTemplate: tier,
+            promptTemplate: "answer",
             response: text,
           });
+          await touchNotebook(notebookId, userId);
           const followups = await generateFollowups(topicLabel, tier, text, true);
           writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
           writer.write({

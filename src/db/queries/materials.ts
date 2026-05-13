@@ -1,10 +1,13 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { db } from "@/db";
 import { materials } from "@/db/schema";
 import type { Material } from "@/db/schema";
 
+export const MATERIALS_PER_NOTEBOOK_CAP = 5;
+
 export async function createMaterial(data: {
   userId: string;
+  notebookId: string;
   kind: "pdf" | "youtube";
   displayName: string;
   sourceUri: string;
@@ -15,12 +18,26 @@ export async function createMaterial(data: {
   return rows[0];
 }
 
-export async function listMaterials(userId: string): Promise<Material[]> {
+export async function listMaterialsByNotebook(
+  userId: string,
+  notebookId: string,
+): Promise<Material[]> {
   return db
     .select()
     .from(materials)
-    .where(eq(materials.userId, userId))
+    .where(and(eq(materials.userId, userId), eq(materials.notebookId, notebookId)))
     .orderBy(desc(materials.createdAt));
+}
+
+export async function countMaterialsInNotebook(
+  userId: string,
+  notebookId: string,
+): Promise<number> {
+  const rows = await db
+    .select({ n: count() })
+    .from(materials)
+    .where(and(eq(materials.userId, userId), eq(materials.notebookId, notebookId)));
+  return rows[0]?.n ?? 0;
 }
 
 export async function getMaterial(id: string, userId: string): Promise<Material | null> {
@@ -30,7 +47,6 @@ export async function getMaterial(id: string, userId: string): Promise<Material 
     .where(eq(materials.id, id))
     .limit(1);
   const m = rows[0];
-  // Return null for missing or wrong-owner — prevents enumeration (don't leak 403)
   if (!m || m.userId !== userId) return null;
   return m;
 }
@@ -59,17 +75,11 @@ export async function deleteMaterial(id: string, userId: string): Promise<void> 
   await db.delete(materials).where(eq(materials.id, id));
 }
 
-// Returns all "ready" materials for a user.
-// Callers (the Gemini pipeline) are responsible for checking Gemini file expiry.
-export async function getReadyMaterials(userId: string): Promise<Material[]> {
-  const all = await listMaterials(userId);
-  return all.filter((m) => m.status === "ready");
-}
-
-export async function getReadyMaterial(
-  id: string,
+// All ready materials in a notebook — used by the chat route to build file parts.
+export async function listReadyMaterialsInNotebook(
   userId: string,
-): Promise<Material | null> {
-  const m = await getMaterial(id, userId);
-  return m && m.status === "ready" ? m : null;
+  notebookId: string,
+): Promise<Material[]> {
+  const all = await listMaterialsByNotebook(userId, notebookId);
+  return all.filter((m) => m.status === "ready");
 }

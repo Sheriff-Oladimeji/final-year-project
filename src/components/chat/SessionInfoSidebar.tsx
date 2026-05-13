@@ -1,37 +1,14 @@
 "use client";
 
-import {
-  FileText,
-  Video,
-  Trash2,
-  Loader2,
-  CheckCircle,
-  XCircle,
-  Target,
-  Zap,
-  Brain,
-  AlertCircle,
-} from "lucide-react";
+import { Target, Zap, Brain, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { deleteMaterialAction } from "@/actions/materials";
 import { cn } from "@/lib/utils";
-import type { Material, Tier, Correctness } from "@/types";
+import type { Tier, Correctness } from "@/types";
 
 interface SessionInfoSidebarProps {
-  material: Material;
+  notebookTitle: string;
+  sourceCount: number;
   topicName: string | null;
   masteryScore: number | null;
   tier: Tier | null;
@@ -66,88 +43,32 @@ const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }>
 };
 
 export function SessionInfoSidebar({
-  material,
+  notebookTitle,
+  sourceCount,
   topicName,
   masteryScore,
   tier,
   recentCorrectness,
 }: SessionInfoSidebarProps) {
-  const router = useRouter();
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  async function handleDelete() {
-    setDeleting(true);
-    const result = await deleteMaterialAction(material.id);
-    if (!("error" in result)) {
-      router.push("/materials");
-      router.refresh();
-    } else {
-      setDeleting(false);
-      setConfirmOpen(false);
-    }
-  }
-
   const tierMeta = tier ? TIER_META[tier] : null;
   const TierIcon = tierMeta?.icon;
 
   return (
-    <aside className="hidden lg:flex w-80 shrink-0 flex-col gap-4">
-      {/* Material card */}
+    <aside className="hidden xl:flex w-72 shrink-0 flex-col gap-3">
+      {/* Notebook header */}
       <div className="rounded-xl border border-border bg-card p-4">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Material
-          </p>
-          <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive -mt-1 -mr-1">
-                <Trash2 className="size-3.5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete material?</DialogTitle>
-                <DialogDescription>
-                  This removes <strong>{material.display_name}</strong> from Gemini and your account. This cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
-                <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-                  {deleting ? <Loader2 className="size-4 animate-spin" /> : "Delete"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="mt-3 flex items-start gap-2.5">
-          <div className="flex-shrink-0 text-primary mt-0.5">
-            {material.kind === "pdf" ? <FileText className="size-4" /> : <Video className="size-4" />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium leading-snug break-words">
-              {material.display_name}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1 capitalize">
-              {material.kind === "pdf" ? "PDF document" : "YouTube video"}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-center gap-2">
-          <Badge
-            variant="outline"
-            className="gap-1 text-xs bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
-          >
-            <CheckCircle className="size-3" />
-            Indexed
-          </Badge>
-        </div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Notebook
+        </p>
+        <p className="text-sm font-semibold mt-2 leading-snug break-words">
+          {notebookTitle}
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {sourceCount} source{sourceCount === 1 ? "" : "s"}
+        </p>
       </div>
 
-      {/* Mastery card */}
+      {/* Mastery */}
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Mastery
@@ -184,11 +105,11 @@ export function SessionInfoSidebar({
         )}
       </div>
 
-      {/* Recent answers */}
+      {/* Recent checks */}
       {recentCorrectness.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Recent answers
+            Recent quick checks
           </p>
           <div className="mt-3 flex items-center gap-1.5">
             {recentCorrectness.slice(-8).map((c, i) => {
@@ -217,7 +138,7 @@ export function SessionInfoSidebar({
           How this works
         </p>
         <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-          Your guide responds with questions instead of answers. Right answer: <span className="text-emerald-600 font-medium">+15</span>. With hint: <span className="text-amber-600 font-medium">+5</span>. Incorrect: <span className="text-red-600 font-medium">−10</span>.
+          The tutor answers from your sources, then ends with a Quick check. Right answer <span className="text-emerald-600 font-medium">+15</span>, with hint <span className="text-amber-600 font-medium">+5</span>, wrong <span className="text-red-600 font-medium">−10</span>, skip <span className="text-muted-foreground font-medium">−5</span>.
         </p>
       </div>
     </aside>

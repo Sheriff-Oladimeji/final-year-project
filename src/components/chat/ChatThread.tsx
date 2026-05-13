@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, Fragment, useMemo } from "react";
-import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { ArrowLeft, Sparkles, BookOpen, AlertCircle, Loader2 } from "lucide-react";
+import { Sparkles, BookOpen, AlertCircle, Loader2 } from "lucide-react";
 import {
   Conversation,
   ConversationContent,
@@ -32,14 +31,14 @@ import {
 } from "@/components/ai-elements/sources";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { SessionInfoSidebar } from "./SessionInfoSidebar";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/ai/chat-types";
-import type { Material, Correctness, Tier } from "@/types";
+import type { Notebook, Material, Correctness, Tier } from "@/types";
 
 interface ChatThreadProps {
-  material: Material;
+  notebook: Notebook;
+  materials: Material[];
   initialMessages: ChatMessage[];
   initialInteractionId: string | null;
 }
@@ -68,12 +67,33 @@ const CORRECTNESS_STYLES: Record<string, { label: string; className: string }> =
 };
 
 export function ChatThread({
-  material,
+  notebook,
+  materials,
   initialMessages,
   initialInteractionId,
 }: ChatThreadProps) {
   const [text, setText] = useState("");
   const [interactionId, setInteractionId] = useState<string | null>(initialInteractionId);
+
+  const readyCount = materials.filter((m) => m.status === "ready").length;
+  const noReadySources = readyCount === 0;
+
+  // Aggregate starter suggestions from all ready materials.
+  const starterSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const m of materials) {
+      if (m.status !== "ready") continue;
+      for (const s of m.suggestions) {
+        if (!seen.has(s)) {
+          seen.add(s);
+          out.push(s);
+        }
+      }
+      if (out.length >= 4) break;
+    }
+    return out.slice(0, 4);
+  }, [materials]);
 
   const { messages, sendMessage, status, error } = useChat<ChatMessage>({
     messages: initialMessages,
@@ -82,19 +102,14 @@ export function ChatThread({
       if (type === "data-interaction") {
         setInteractionId((data as { id: string }).id);
       } else if (type === "data-mode") {
-        // After an "answer" or "meta" turn, the next user message is fresh —
-        // not a reply to a guided question. Clear the interaction pointer so
-        // the server classifier handles routing.
         const mode = (data as { value: string }).value;
         if (mode === "answer" || mode === "meta") {
-          // Note: this fires on every chunk; safe to set repeatedly.
           setInteractionId(null);
         }
       }
     },
   });
 
-  // Derive sidebar state and the latest turn's suggestions.
   const { topicName, masteryScore, tier, recentCorrectness, latestSuggestions } = useMemo(() => {
     let topicName: string | null = null;
     let masteryScore: number | null = null;
@@ -104,7 +119,6 @@ export function ChatThread({
 
     for (const m of messages) {
       if (m.role !== "assistant") continue;
-      let messageHadSuggestions: string[] | null = null;
       for (const part of m.parts) {
         if (part.type === "data-topic") {
           topicName = part.data.name;
@@ -115,25 +129,20 @@ export function ChatThread({
           tier = part.data.new_tier;
           recent.push(part.data.correctness);
         } else if (part.type === "data-suggestions") {
-          messageHadSuggestions = part.data.items;
+          latestSuggestions = part.data.items;
         }
       }
-      if (messageHadSuggestions) latestSuggestions = messageHadSuggestions;
     }
-    // recentCorrectness for sidebar — exclude give_up from it (sidebar dots only
-    // count actual answer attempts).
-    const recentCorrectness = recent.filter(
-      (c): c is Correctness => c !== "give_up",
-    );
+    const recentCorrectness = recent.filter((c): c is Correctness => c !== "give_up");
     return { topicName, masteryScore, tier, recentCorrectness, latestSuggestions };
   }, [messages]);
 
   function send(userText: string) {
     const trimmed = userText.trim();
-    if (!trimmed) return;
+    if (!trimmed || noReadySources) return;
     sendMessage(
       { text: trimmed },
-      { body: { materialId: material.id, interactionId: interactionId ?? undefined } },
+      { body: { notebookId: notebook.id, interactionId: interactionId ?? undefined } },
     );
     setText("");
   }
@@ -149,114 +158,116 @@ export function ChatThread({
         ? "error"
         : "ready";
 
-  // Decide which suggestions row to show above the input.
-  // - Empty thread → starter suggestions from material indexing
-  // - Otherwise → contextual follow-ups from latest assistant turn
   const visibleSuggestions =
     messages.length === 0
-      ? material.suggestions
+      ? starterSuggestions
       : status === "ready"
         ? latestSuggestions
         : [];
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-6rem)]">
-      {/* Chat panel */}
+    <div className="flex flex-1 min-w-0 gap-6">
       <div className="flex flex-1 min-w-0 flex-col">
-        <div className="mb-2">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 h-8 text-muted-foreground hover:text-foreground gap-1.5">
-            <Link href="/materials">
-              <ArrowLeft className="size-3.5" />
-              All materials
-            </Link>
-          </Button>
-        </div>
-
-        <Conversation className="flex-1">
-          <ConversationContent className="px-0">
-            {messages.length === 0 && (
-              <ConversationEmptyState
-                icon={<Sparkles className="size-10 text-primary" />}
-                title={`Ask anything about ${material.display_name}`}
-                description="Your guide responds with questions calibrated to your mastery level. Stuck? Type 'I don't know' and you'll get a direct answer."
-              />
-            )}
-
-            {messages.map((message) => (
-              <Fragment key={message.id}>
-                {message.role === "assistant" && <AssistantTurn message={message} />}
-                {message.role === "user" && (
-                  <Message from="user">
-                    <MessageContent>
-                      {message.parts.map((part, i) =>
-                        part.type === "text" ? (
-                          <span key={i} className="whitespace-pre-wrap">
-                            {part.text}
-                          </span>
-                        ) : null,
-                      )}
-                    </MessageContent>
-                  </Message>
-                )}
-              </Fragment>
-            ))}
-
-            {status === "submitted" && (
-              <Message from="assistant">
-                <MessageContent className="border-l-2 border-primary/40 pl-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="size-3.5 animate-spin text-primary" />
-                    <ThinkingDots />
-                  </div>
-                </MessageContent>
-              </Message>
-            )}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-
-        {error && (
-          <Alert variant="destructive" className="mt-3 mb-2">
-            <AlertCircle className="size-4" />
-            <AlertDescription className="text-xs">
-              Couldn&apos;t process that. Please try again.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {visibleSuggestions.length > 0 && (
-          <div className="mb-3">
-            <Suggestions>
-              {visibleSuggestions.map((s) => (
-                <Suggestion key={s} suggestion={s} onClick={(v) => send(v)} />
-              ))}
-            </Suggestions>
-          </div>
-        )}
-
-        <PromptInput onSubmit={handleSubmit}>
-          <PromptInputBody>
-            <PromptInputTextarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={
-                interactionId
-                  ? "Type your answer to the guided question…"
-                  : `Ask anything about ${material.display_name}…`
+      <Conversation className="flex-1">
+        <ConversationContent className="px-0">
+          {messages.length === 0 && (
+            <ConversationEmptyState
+              icon={<Sparkles className="size-10 text-primary" />}
+              title={
+                noReadySources
+                  ? "Add a source to get started"
+                  : `Ask anything about ${notebook.title}`
+              }
+              description={
+                noReadySources
+                  ? "Upload at least one PDF or YouTube video on the left, then ask away."
+                  : "The tutor answers from your sources, then asks a Quick check to track mastery."
               }
             />
-          </PromptInputBody>
-          <PromptInputFooter>
-            <span className="text-xs text-muted-foreground">
-              Enter to send · Shift+Enter for new line
-            </span>
-            <PromptInputSubmit status={submitStatus} disabled={!text.trim()} />
-          </PromptInputFooter>
-        </PromptInput>
+          )}
+
+          {messages.map((message) => (
+            <Fragment key={message.id}>
+              {message.role === "assistant" && <AssistantTurn message={message} />}
+              {message.role === "user" && (
+                <Message from="user">
+                  <MessageContent>
+                    {message.parts.map((part, i) =>
+                      part.type === "text" ? (
+                        <span key={i} className="whitespace-pre-wrap">
+                          {part.text}
+                        </span>
+                      ) : null,
+                    )}
+                  </MessageContent>
+                </Message>
+              )}
+            </Fragment>
+          ))}
+
+          {status === "submitted" && (
+            <Message from="assistant">
+              <MessageContent className="border-l-2 border-primary/40 pl-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin text-primary" />
+                  <ThinkingDots />
+                </div>
+              </MessageContent>
+            </Message>
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+
+      {error && (
+        <Alert variant="destructive" className="mt-3 mb-2">
+          <AlertCircle className="size-4" />
+          <AlertDescription className="text-xs">
+            Couldn&apos;t process that. Please try again.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {visibleSuggestions.length > 0 && !noReadySources && (
+        <div className="mb-3">
+          <Suggestions>
+            {visibleSuggestions.map((s) => (
+              <Suggestion key={s} suggestion={s} onClick={(v) => send(v)} />
+            ))}
+          </Suggestions>
+        </div>
+      )}
+
+      <PromptInput onSubmit={handleSubmit}>
+        <PromptInputBody>
+          <PromptInputTextarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            disabled={noReadySources}
+            placeholder={
+              noReadySources
+                ? "Add a source first to start chatting…"
+                : interactionId
+                  ? "Type your answer to the Quick check…"
+                  : `Ask anything about ${notebook.title}…`
+            }
+          />
+        </PromptInputBody>
+        <PromptInputFooter>
+          <span className="text-xs text-muted-foreground">
+            Enter to send · Shift+Enter for new line
+          </span>
+          <PromptInputSubmit
+            status={submitStatus}
+            disabled={!text.trim() || noReadySources}
+          />
+        </PromptInputFooter>
+      </PromptInput>
       </div>
 
       <SessionInfoSidebar
-        material={material}
+        notebookTitle={notebook.title}
+        sourceCount={materials.length}
         topicName={topicName}
         masteryScore={masteryScore}
         tier={tier}

@@ -6,7 +6,7 @@ import type { Interaction } from "@/db/schema";
 export async function createInteraction(data: {
   userId: string;
   sessionId?: string;
-  materialId?: string;
+  notebookId: string;
   topicId: string;
   question: string;
   retrievedContext: string;
@@ -39,6 +39,19 @@ export async function getInteraction(id: string, userId: string): Promise<Intera
   return rows[0] ?? null;
 }
 
+export async function listInteractionsByNotebook(
+  userId: string,
+  notebookId: string,
+  limit = 200,
+): Promise<Interaction[]> {
+  return db
+    .select()
+    .from(interactions)
+    .where(and(eq(interactions.userId, userId), eq(interactions.notebookId, notebookId)))
+    .orderBy(asc(interactions.createdAt))
+    .limit(limit);
+}
+
 export async function listInteractionsByTopic(
   topicId: string,
   userId: string,
@@ -49,20 +62,6 @@ export async function listInteractionsByTopic(
     .from(interactions)
     .where(and(eq(interactions.topicId, topicId), eq(interactions.userId, userId)))
     .orderBy(desc(interactions.createdAt))
-    .limit(limit);
-}
-
-// History for a single material — chronological, used to seed useChat on page load.
-export async function listInteractionsByMaterial(
-  userId: string,
-  materialId: string,
-  limit = 200,
-): Promise<Interaction[]> {
-  return db
-    .select()
-    .from(interactions)
-    .where(and(eq(interactions.userId, userId), eq(interactions.materialId, materialId)))
-    .orderBy(asc(interactions.createdAt))
     .limit(limit);
 }
 

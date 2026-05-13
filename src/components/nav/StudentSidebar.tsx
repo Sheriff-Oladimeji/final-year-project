@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Library, LogOut, BrainCircuit, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, LogOut, BrainCircuit, ShieldCheck } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 const links = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/materials", label: "Materials", icon: Library },
+  { href: "/dashboard", label: "Notebooks", icon: LayoutDashboard },
 ];
 
 interface StudentSidebarProps {
@@ -45,7 +44,10 @@ export function StudentSidebar({ isAdmin, userEmail }: StudentSidebarProps) {
       {/* Nav (scrollable when content overflows) */}
       <nav className="flex-1 min-h-0 overflow-y-auto space-y-0.5 p-3">
         {links.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
+          const active =
+            pathname === href ||
+            pathname.startsWith(href + "/") ||
+            (href === "/dashboard" && pathname.startsWith("/notebooks/"));
           return (
             <Link
               key={href}

@@ -7,17 +7,16 @@ import type { ScoreHistoryEntry, Tier } from "@/types";
 
 export async function getOrCreateTopic(
   userId: string,
-  materialId: string,
+  notebookId: string,
   name: string,
 ): Promise<Topic> {
-  // Topics are scoped per (user, material, name).
   const existing = await db
     .select()
     .from(topics)
     .where(
       and(
         eq(topics.userId, userId),
-        eq(topics.materialId, materialId),
+        eq(topics.notebookId, notebookId),
         eq(topics.name, name),
       ),
     )
@@ -27,19 +26,18 @@ export async function getOrCreateTopic(
 
   const rows = await db
     .insert(topics)
-    .values({ userId, materialId, name })
+    .values({ userId, notebookId, name })
     .onConflictDoNothing()
     .returning();
 
   if (rows.length === 0) {
-    // Concurrent insert won the race — re-fetch.
     const fetched = await db
       .select()
       .from(topics)
       .where(
         and(
           eq(topics.userId, userId),
-          eq(topics.materialId, materialId),
+          eq(topics.notebookId, notebookId),
           eq(topics.name, name),
         ),
       )
@@ -50,14 +48,14 @@ export async function getOrCreateTopic(
   return rows[0];
 }
 
-export async function listMaterialTopicNames(
+export async function listNotebookTopicNames(
   userId: string,
-  materialId: string,
+  notebookId: string,
 ): Promise<string[]> {
   const rows = await db
     .select({ name: topics.name })
     .from(topics)
-    .where(and(eq(topics.userId, userId), eq(topics.materialId, materialId)))
+    .where(and(eq(topics.userId, userId), eq(topics.notebookId, notebookId)))
     .orderBy(desc(topics.updatedAt));
   return rows.map((r) => r.name);
 }
@@ -73,7 +71,7 @@ export async function updateMasteryScore(topicId: string, newScore: number): Pro
 
 export interface TopicWithHistory {
   id: string;
-  materialId: string;
+  notebookId: string;
   name: string;
   masteryScore: number;
   updatedAt: Date;
@@ -107,7 +105,7 @@ export async function listTopicsWithHistory(
 
     result.push({
       id: topic.id,
-      materialId: topic.materialId,
+      notebookId: topic.notebookId,
       name: topic.name,
       masteryScore: topic.masteryScore,
       updatedAt: topic.updatedAt,

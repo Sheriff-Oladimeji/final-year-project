@@ -11,12 +11,21 @@ export interface UserAdmin extends User {
   disabled_at: string | null;
 }
 
+export interface Notebook {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type MaterialKind = "pdf" | "youtube";
 export type MaterialStatus = "pending" | "ready" | "failed";
 
 export interface Material {
   id: string;
   user_id: string;
+  notebook_id: string;
   kind: MaterialKind;
   display_name: string;
   source_uri: string;
@@ -58,7 +67,7 @@ export interface ScoreHistoryEntry {
 
 export interface Topic {
   id: string;
-  material_id: string;
+  notebook_id: string;
   name: string;
   mastery_score: number;
   updated_at: string;
@@ -73,7 +82,7 @@ export interface Interaction {
   student_reply: string | null;
   correctness: Correctness | "unscored";
   score_delta: number;
-  prompt_template: Tier;
+  prompt_template: string;
   created_at: string;
 }
 
