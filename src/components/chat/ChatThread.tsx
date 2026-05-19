@@ -308,7 +308,7 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
     }
   }
 
-  const text = textChunks.join("");
+  const text = textChunks.join("").replace(/\[source:[^\]]*\]/gi, "").replace(/\s{2,}/g, " ").trim();
   const correctnessStyle = score ? CORRECTNESS_STYLES[score.correctness] : null;
 
   return (

@@ -41,7 +41,7 @@ export function NotebookDetail({
   initialInteractionId,
 }: NotebookDetailProps) {
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-screen px-6 py-4">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2 min-w-0">

@@ -9,6 +9,8 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,41 +37,83 @@ interface SourcesPanelProps {
 export function SourcesPanel({ notebookId, materials, cap }: SourcesPanelProps) {
   const count = materials.length;
   const atCap = count >= cap;
+  const [collapsed, setCollapsed] = useState(false);
+
+  if (collapsed) {
+    return (
+      <aside className="hidden lg:flex shrink-0 flex-col">
+        <div className="rounded-xl border border-border bg-card p-2 flex flex-col items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setCollapsed(false)}
+            title="Show sources"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <PanelLeftOpen className="size-4" />
+          </Button>
+          <div className="flex flex-col items-center gap-1.5">
+            {materials.map((m) => (
+              <div key={m.id} title={m.display_name} className={cn(
+                "size-1.5 rounded-full",
+                m.status === "ready" ? "bg-emerald-500" : "bg-muted-foreground/40",
+              )} />
+            ))}
+          </div>
+        </div>
+      </aside>
+    );
+  }
 
   return (
-    <aside className="hidden lg:flex w-72 shrink-0 flex-col gap-3">
-      <div className="rounded-xl border border-border bg-card p-3">
-        <div className="flex items-center justify-between gap-2 mb-3">
+    <aside className="hidden lg:flex w-64 shrink-0 flex-col gap-3">
+      <div className="rounded-xl border border-border bg-card p-3 flex flex-col gap-3 h-full">
+        <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Sources
           </p>
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {count}/{cap}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {count}/{cap}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setCollapsed(true)}
+              title="Hide sources"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <PanelLeftClose className="size-3.5" />
+            </Button>
+          </div>
         </div>
 
-        {materials.length === 0 ? (
-          <p className="text-xs text-muted-foreground px-1 py-2">
-            Add a PDF or YouTube video to start chatting.
-          </p>
-        ) : (
-          <ul className="space-y-1 mb-3">
-            {materials.map((m) => (
-              <SourceRow key={m.id} material={m} />
-            ))}
-          </ul>
-        )}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {materials.length === 0 ? (
+            <p className="text-xs text-muted-foreground px-1 py-2">
+              Add a PDF or YouTube video to start chatting.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {materials.map((m) => (
+                <SourceRow key={m.id} material={m} />
+              ))}
+            </ul>
+          )}
+        </div>
 
-        <AddMaterialDialog
-          notebookId={notebookId}
-          disabled={atCap}
-          disabledReason={atCap ? `Limit of ${cap} sources reached` : undefined}
-        />
-        {atCap && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Limit of {cap} sources reached. Delete one to add another.
-          </p>
-        )}
+        <div className="shrink-0">
+          <AddMaterialDialog
+            notebookId={notebookId}
+            disabled={atCap}
+            disabledReason={atCap ? `Limit of ${cap} sources reached` : undefined}
+          />
+          {atCap && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Limit of {cap} sources reached. Delete one to add another.
+            </p>
+          )}
+        </div>
       </div>
     </aside>
   );
