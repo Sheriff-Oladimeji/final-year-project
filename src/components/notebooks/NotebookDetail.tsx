@@ -8,7 +8,7 @@ import {
   Trash2,
   Pencil,
   Loader2,
-  BookOpen,
+  PanelLeftOpen,
   Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ export function NotebookDetail({
             onClick={() => setMobileSources(true)}
             title="Show sources"
           >
-            <BookOpen className="size-4" />
+            <PanelLeftOpen className="size-4" />
           </Button>
 
           <Button asChild variant="ghost" size="sm" className="-ml-1 h-8 text-muted-foreground hover:text-foreground gap-1.5 shrink-0">

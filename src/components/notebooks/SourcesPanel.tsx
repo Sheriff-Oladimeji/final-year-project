@@ -44,29 +44,29 @@ export function SourcesPanel({ notebookId, materials, cap, mobileOpen = false, o
 
   const panelContent = (
     <>
+      {/* Add source button always at top, like NotebookLM */}
+      <AddMaterialDialog
+        notebookId={notebookId}
+        disabled={atCap}
+        disabledReason={atCap ? `Limit of ${cap} sources reached` : undefined}
+      />
+      {atCap && (
+        <p className="text-xs text-muted-foreground">
+          Limit of {cap} sources reached. Delete one to add another.
+        </p>
+      )}
+
       {materials.length === 0 ? (
         <p className="text-xs text-muted-foreground px-1 py-2">
-          Add a PDF or YouTube video to start chatting.
+          No sources yet. Add a PDF or YouTube video above.
         </p>
       ) : (
-        <ul className="space-y-1">
+        <ul className="space-y-1 mt-1">
           {materials.map((m) => (
             <SourceRow key={m.id} material={m} />
           ))}
         </ul>
       )}
-      <div className="pt-2">
-        <AddMaterialDialog
-          notebookId={notebookId}
-          disabled={atCap}
-          disabledReason={atCap ? `Limit of ${cap} sources reached` : undefined}
-        />
-        {atCap && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Limit of {cap} sources reached. Delete one to add another.
-          </p>
-        )}
-      </div>
     </>
   );
 
