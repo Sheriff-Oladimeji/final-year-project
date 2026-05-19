@@ -146,7 +146,10 @@ function parseRetrieved(raw: string): { contextText: string; citations: Citation
   return { contextText: contextParts.join("\n\n"), citations };
 }
 
-const SuggestionsSchema = z.object({ suggestions: z.array(z.string()).length(3) });
+const SuggestionsSchema = z.object({ suggestions: z.array(z.string()).min(1).max(5) });
+
+const DEFAULT_CHECK_SUGGESTIONS = ["i don't know", "show me the answer", "give me a hint"];
+const DEFAULT_FREE_SUGGESTIONS = ["tell me more", "give me an example", "how does this apply?"];
 
 async function generateFollowups(
   topic: string,
@@ -160,10 +163,11 @@ async function generateFollowups(
       schema: SuggestionsSchema,
       prompt: FOLLOWUP_SUGGESTIONS_TEMPLATE(topic, tier, lastAssistant, endsWithCheck),
     });
-    return object.suggestions;
+    if (object.suggestions.length > 0) return object.suggestions;
   } catch {
-    return [];
+    // fall through to defaults
   }
+  return endsWithCheck ? DEFAULT_CHECK_SUGGESTIONS : DEFAULT_FREE_SUGGESTIONS;
 }
 
 export async function POST(req: Request) {
@@ -236,22 +240,12 @@ export async function POST(req: Request) {
     execute: async ({ writer }) => {
       // ── META ─────────────────────────────────────────────────────────────
       if (intent === "meta") {
-        const result = streamText({
-          model: geminiModel,
-          prompt: META_TEMPLATE(userText),
-          onFinish: async ({ text }) => {
-            const followups = await generateFollowups("the LearnAI app", "meta", text, false);
-            writer.write({ type: "data-mode", id: "mode", data: { value: "meta" } });
-            if (followups.length) {
-              writer.write({
-                type: "data-suggestions",
-                id: "sugs",
-                data: { items: followups },
-              });
-            }
-          },
-        });
+        const result = streamText({ model: geminiModel, prompt: META_TEMPLATE(userText) });
         writer.merge(result.toUIMessageStream());
+        const text = await result.text;
+        const followups = await generateFollowups("the LearnAI app", "meta", text, false);
+        writer.write({ type: "data-mode", id: "mode", data: { value: "meta" } });
+        writer.write({ type: "data-suggestions", id: "sugs", data: { items: followups } });
         return;
       }
 
@@ -259,10 +253,7 @@ export async function POST(req: Request) {
       if (intent === "give_up" && priorInteraction) {
         const interaction = priorInteraction;
         const contextText = interaction.retrievedContext ?? "";
-        const topicRows = await db
-          .select()
-          .from(topics)
-          .where(eq(topics.id, interaction.topicId));
+        const topicRows = await db.select().from(topics).where(eq(topics.id, interaction.topicId));
         const topic = topicRows[0];
         const newScore = clipScore(topic.masteryScore + scoreDelta("give_up"));
         const newTier = getMasteryTier(newScore);
@@ -279,49 +270,26 @@ export async function POST(req: Request) {
         const prompt = REVEAL_TEMPLATE(interaction.response, contextText, topic.name, notebookTitle);
         const result = streamText({
           model: geminiModel,
-          messages: [
-            { role: "user", content: [{ type: "text", text: prompt }, ...fileParts] },
-          ],
-          onFinish: async ({ text }) => {
-            const next = await createInteraction({
-              userId,
-              sessionId,
-              notebookId,
-              topicId: topic.id,
-              question: interaction.question,
-              retrievedContext: contextText,
-              promptTemplate: "reveal",
-              response: text,
-            });
-            await touchNotebook(notebookId, userId);
-            const followups = await generateFollowups(topic.name, newTier, text, true);
-            writer.write({ type: "data-mode", id: "mode", data: { value: "answer" } });
-            writer.write({
-              type: "data-topic",
-              id: "topic",
-              data: { name: topic.name, mastery_score: newScore, tier: newTier },
-            });
-            writer.write({
-              type: "data-score",
-              id: "score",
-              data: {
-                correctness: "give_up",
-                score_delta: scoreDelta("give_up"),
-                new_score: newScore,
-                new_tier: newTier,
-              },
-            });
-            writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
-            if (followups.length) {
-              writer.write({
-                type: "data-suggestions",
-                id: "sugs",
-                data: { items: followups },
-              });
-            }
-          },
+          messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...fileParts] }],
         });
         writer.merge(result.toUIMessageStream());
+        const text = await result.text;
+
+        const [next, followups] = await Promise.all([
+          createInteraction({
+            userId, sessionId, notebookId, topicId: topic.id,
+            question: interaction.question, retrievedContext: contextText,
+            promptTemplate: "reveal", response: text,
+          }),
+          generateFollowups(topic.name, newTier, text, true),
+        ]);
+        await touchNotebook(notebookId, userId);
+
+        writer.write({ type: "data-mode", id: "mode", data: { value: "answer" } });
+        writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
+        writer.write({ type: "data-score", id: "score", data: { correctness: "give_up", score_delta: scoreDelta("give_up"), new_score: newScore, new_tier: newTier } });
+        writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
+        writer.write({ type: "data-suggestions", id: "sugs", data: { items: followups } });
         return;
       }
 
@@ -337,72 +305,41 @@ export async function POST(req: Request) {
         const correctness = parseCorrectness(correctnessRaw.text);
         const delta = scoreDelta(correctness);
 
-        const topicRows = await db
-          .select()
-          .from(topics)
-          .where(eq(topics.id, interaction.topicId));
+        const topicRows = await db.select().from(topics).where(eq(topics.id, interaction.topicId));
         const topic = topicRows[0];
         const newScore = clipScore(topic.masteryScore + delta);
         const newTier = getMasteryTier(newScore);
 
         await Promise.all([
           updateMasteryScore(interaction.topicId, newScore),
-          updateInteraction(interaction.id, userId, {
-            studentReply: userText,
-            correctness,
-            scoreDelta: delta,
-          }),
+          updateInteraction(interaction.id, userId, { studentReply: userText, correctness, scoreDelta: delta }),
         ]);
 
-        // For the next turn, treat the original question as the topic anchor
-        // and emit a fresh direct answer + new check.
         const prompt = DIRECT_ANSWER_TEMPLATE(
-          interaction.question,
-          contextText,
-          topic.name,
-          conversation,
-          notebookTitle,
+          interaction.question, contextText, topic.name, conversation, notebookTitle, newTier,
         );
         const result = streamText({
           model: geminiModel,
-          messages: [
-            { role: "user", content: [{ type: "text", text: prompt }, ...fileParts] },
-          ],
-          onFinish: async ({ text }) => {
-            const next = await createInteraction({
-              userId,
-              sessionId,
-              notebookId,
-              topicId: topic.id,
-              question: interaction.question,
-              retrievedContext: contextText,
-              promptTemplate: "answer",
-              response: text,
-            });
-            await touchNotebook(notebookId, userId);
-            const followups = await generateFollowups(topic.name, newTier, text, true);
-            writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
-            writer.write({
-              type: "data-topic",
-              id: "topic",
-              data: { name: topic.name, mastery_score: newScore, tier: newTier },
-            });
-            writer.write({
-              type: "data-score",
-              id: "score",
-              data: { correctness, score_delta: delta, new_score: newScore, new_tier: newTier },
-            });
-            writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
-            if (followups.length) {
-              writer.write({
-                type: "data-suggestions",
-                id: "sugs",
-                data: { items: followups },
-              });
-            }
-          },
+          messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...fileParts] }],
         });
         writer.merge(result.toUIMessageStream());
+        const text = await result.text;
+
+        const [next, followups] = await Promise.all([
+          createInteraction({
+            userId, sessionId, notebookId, topicId: topic.id,
+            question: interaction.question, retrievedContext: contextText,
+            promptTemplate: "answer", response: text,
+          }),
+          generateFollowups(topic.name, newTier, text, true),
+        ]);
+        await touchNotebook(notebookId, userId);
+
+        writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
+        writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
+        writer.write({ type: "data-score", id: "score", data: { correctness, score_delta: delta, new_score: newScore, new_tier: newTier } });
+        writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
+        writer.write({ type: "data-suggestions", id: "sugs", data: { items: followups } });
         return;
       }
 
@@ -411,27 +348,11 @@ export async function POST(req: Request) {
       const [topicGen, retrievedGen] = await Promise.all([
         generateText({
           model: geminiModel,
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: CLASSIFY_TOPIC_TEMPLATE(userText, recentTopics) },
-                ...fileParts,
-              ],
-            },
-          ],
+          messages: [{ role: "user", content: [{ type: "text", text: CLASSIFY_TOPIC_TEMPLATE(userText, recentTopics) }, ...fileParts] }],
         }),
         generateText({
           model: geminiModel,
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: RETRIEVE_PROMPT(userText) },
-                ...fileParts,
-              ],
-            },
-          ],
+          messages: [{ role: "user", content: [{ type: "text", text: RETRIEVE_PROMPT(userText) }, ...fileParts] }],
         }),
       ]);
 
@@ -441,54 +362,32 @@ export async function POST(req: Request) {
       const { contextText, citations } = parseRetrieved(retrievedGen.text);
       const topic = await getOrCreateTopic(userId, notebookId, topicLabel);
       const tier = getMasteryTier(topic.masteryScore);
-      const prompt = DIRECT_ANSWER_TEMPLATE(
-        userText,
-        contextText,
-        topicLabel,
-        conversation,
-        notebookTitle,
-      );
 
+      const prompt = DIRECT_ANSWER_TEMPLATE(
+        userText, contextText, topicLabel, conversation, notebookTitle, tier,
+      );
       const result = streamText({
         model: geminiModel,
-        messages: [
-          { role: "user", content: [{ type: "text", text: prompt }, ...fileParts] },
-        ],
-        onFinish: async ({ text }) => {
-          const interaction = await createInteraction({
-            userId,
-            sessionId,
-            notebookId,
-            topicId: topic.id,
-            question: userText,
-            retrievedContext: contextText,
-            promptTemplate: "answer",
-            response: text,
-          });
-          await touchNotebook(notebookId, userId);
-          const followups = await generateFollowups(topicLabel, tier, text, true);
-          writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
-          writer.write({
-            type: "data-topic",
-            id: "topic",
-            data: { name: topicLabel, mastery_score: topic.masteryScore, tier },
-          });
-          writer.write({
-            type: "data-citations",
-            id: "citations",
-            data: { items: citations },
-          });
-          writer.write({ type: "data-interaction", id: "interaction", data: { id: interaction.id } });
-          if (followups.length) {
-            writer.write({
-              type: "data-suggestions",
-              id: "sugs",
-              data: { items: followups },
-            });
-          }
-        },
+        messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...fileParts] }],
       });
       writer.merge(result.toUIMessageStream());
+      const text = await result.text;
+
+      const [interaction, followups] = await Promise.all([
+        createInteraction({
+          userId, sessionId, notebookId, topicId: topic.id,
+          question: userText, retrievedContext: contextText,
+          promptTemplate: "answer", response: text,
+        }),
+        generateFollowups(topicLabel, tier, text, true),
+      ]);
+      await touchNotebook(notebookId, userId);
+
+      writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
+      writer.write({ type: "data-topic", id: "topic", data: { name: topicLabel, mastery_score: topic.masteryScore, tier } });
+      writer.write({ type: "data-citations", id: "citations", data: { items: citations } });
+      writer.write({ type: "data-interaction", id: "interaction", data: { id: interaction.id } });
+      writer.write({ type: "data-suggestions", id: "sugs", data: { items: followups } });
     },
     onError: (error) => {
       console.error("[/api/chat] error", error);

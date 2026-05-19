@@ -37,6 +37,7 @@ export const DIRECT_ANSWER_TEMPLATE = (
   topic: string,
   conversation: string,
   notebookTitle: string,
+  tier: "recall" | "application" | "analysis" = "recall",
 ) => `\
 You are an AI tutor helping a student work through their notebook "${notebookTitle}".
 Your job is to answer their question directly using ONLY the attached source
@@ -48,8 +49,9 @@ sources. If the sources don't cover the question, say so honestly in one
 sentence and ask if they'd like to add a source that does.
 
 Topic of this turn: ${topic}
+Student's current mastery tier: ${tier}
 
-${conversation ? `Recent conversation:\n${conversation}\n` : ""}
+${conversation ? `Recent conversation (do NOT repeat a Quick check that already appeared here):\n${conversation}\n` : ""}
 Student's current message: ${question}
 
 Relevant excerpts from their sources:
@@ -57,13 +59,24 @@ ${context}
 
 Respond in this exact shape:
 1. A 3 to 6 sentence direct answer in plain prose, grounded in the excerpts
-   above. Define any new term briefly when it first appears. Where useful,
-   attribute a specific claim with an inline citation like "[source: <name>]".
-   Do not use bullet lists. Do not say "as the material states" or
-   "the document says".
+   above. Define any new term briefly when it first appears. Do not use bullet
+   lists. Do not say "as the material states" or "the document says".
 2. A blank line.
-3. Exactly one short comprehension-check question to confirm they grasped the
-   core idea, prefixed with "Quick check: " — 8 to 15 words, no answers given.
+3. Exactly one comprehension-check question, prefixed with "Quick check: ".
+
+   Rules for the Quick check:
+   - NEVER ask "What is X?" or "Define X" — those are too shallow.
+   - Pick the format that best tests understanding of THIS specific answer.
+     Good formats (choose the most fitting, don't always use the same one):
+       • "In your own words, describe …"
+       • "Give an example of …"
+       • "Why does … matter?"
+       • "How does … differ from …?"
+       • "What would happen if …?"
+       • "How would you apply … to …?"
+       • "What is the relationship between … and …?"
+   - Match depth to tier: ${tier === "recall" ? "recall tier — test basic comprehension of the core concept" : tier === "application" ? "application tier — ask them to use or apply the concept" : "analysis tier — ask them to compare, evaluate, or reason about the concept"}.
+   - Keep it to 8–15 words. No answer hints.
 
 No emojis. No apologies. No headings.
 `;
@@ -142,7 +155,9 @@ Respond in this exact shape:
 1. A 2 to 4 sentence direct answer to the Quick check, grounded in the material.
 2. A blank line.
 3. Exactly one new comprehension question, prefixed with "Quick check: ",
-   slightly easier than the previous one, 8 to 15 words.
+   slightly easier than the previous one, 8–15 words.
+   NEVER ask "What is X?" or "Define X". Use a varied format:
+   "In your own words …", "Give an example of …", "Why does … matter?", etc.
 
 No emojis. No apologies. Plain prose only.
 `;
@@ -179,13 +194,16 @@ The tutor just said:
 
 "${lastAssistantMessage}"
 
-Generate exactly 3 short follow-up messages the student might want to send
-next. Tailor them to what the tutor just said.
+Generate exactly 3 short messages the student might want to send next.
+Each suggestion must be something the student would SEND, not something the
+tutor would say — phrase it as the student's own words.
 
 Rules:
-- Each suggestion is 4 to 12 words, phrased as the student would type it
-- Lowercase casual style is fine
-- ${endsWithCheck ? 'One of the three MUST be a give-up option like "i don\'t know" or "show me the answer"' : 'Suggest natural follow-ups (e.g. ask for an example, ask about a related concept, ask to go deeper)'}
+- 4 to 10 words each, lowercase casual style
+- Do NOT fragment or quote the tutor's answer — write what the student would SAY
+- ${endsWithCheck
+    ? 'The tutor ended with a Quick check. One suggestion MUST be a give-up phrase like "i don\'t know" or "show me the answer". The other two should be genuine attempts or related follow-up questions.'
+    : 'Suggest natural follow-ups: ask for an example, relate it to something else, ask a deeper question about the topic.'}
 - Do not number or prefix them
 `;
 
