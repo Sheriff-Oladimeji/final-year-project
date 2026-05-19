@@ -43,6 +43,13 @@
       "when": 1778688510487,
       "tag": "0005_swift_emma_frost",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1747699200000,
+      "tag": "0006_fix_stale_fk_constraints",
+      "breakpoints": true
     }
   ]
 }

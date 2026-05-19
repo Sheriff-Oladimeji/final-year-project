@@ -35,6 +35,13 @@
  *   npm run db:migrate -- --verbose      # print every statement
  *   npm run db:migrate -- --dry-run      # show plan, run nothing
  *   npm run db:migrate -- --status       # list applied vs pending
+ *   npm run db:migrate -- --check-fk     # audit FK constraints for drift
+ *
+ * FK drift check (--check-fk or runs automatically after every apply):
+ *   Queries information_schema for all FK constraints on app tables and
+ *   flags any constraint whose name embeds a column name that no longer
+ *   exists on that table. This catches the "renamed column, old constraint
+ *   left behind" class of bug that drizzle-kit can't see.
  */
 
 import { Pool, type PoolClient } from "@neondatabase/serverless";
@@ -69,6 +76,7 @@ const FORCE_RESET = args.has("--force-reset");
 const VERBOSE = args.has("--verbose");
 const DRY_RUN = args.has("--dry-run");
 const STATUS_ONLY = args.has("--status");
+const CHECK_FK_ONLY = args.has("--check-fk");
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -95,6 +103,11 @@ async function main() {
   try {
     await ensureMigrationsTable(client);
 
+    if (CHECK_FK_ONLY) {
+      await checkFkDrift(client);
+      return;
+    }
+
     const journal = await readJournal();
     const appliedHashes = await readAppliedHashes(client);
 
@@ -114,6 +127,7 @@ async function main() {
 
     if (pending.length === 0) {
       console.log("✓ Database is up to date. Nothing to apply.");
+      await checkFkDrift(client);
       return;
     }
 
@@ -135,6 +149,7 @@ async function main() {
     }
 
     console.log(`\n✓ Applied ${pending.length} migration${pending.length === 1 ? "" : "s"}.`);
+    await checkFkDrift(client);
   } finally {
     client.release();
     await pool.end();
@@ -308,6 +323,121 @@ function printStatus(
   }
   const pending = plan.filter((p) => !applied.has(p.hash)).length;
   console.log(`\nPending: ${pending}`);
+}
+
+// ── FK drift check ───────────────────────────────────────────────────────────
+
+interface FkRow {
+  constraint_name: string;
+  table_name: string;
+  column_name: string;
+  foreign_table_name: string;
+  foreign_column_name: string;
+}
+
+async function checkFkDrift(client: PoolClient) {
+  // Pull every FK on every non-system table in the public schema.
+  const res = await client.query<FkRow>(`
+    SELECT
+      tc.constraint_name,
+      tc.table_name,
+      kcu.column_name,
+      ccu.table_name  AS foreign_table_name,
+      ccu.column_name AS foreign_column_name
+    FROM information_schema.table_constraints  AS tc
+    JOIN information_schema.key_column_usage   AS kcu
+      ON tc.constraint_name = kcu.constraint_name
+     AND tc.table_schema    = kcu.table_schema
+    JOIN information_schema.constraint_column_usage AS ccu
+      ON tc.constraint_name = ccu.constraint_name
+     AND tc.table_schema    = ccu.table_schema
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND tc.table_schema    = 'public'
+    ORDER BY tc.table_name, tc.constraint_name
+  `);
+
+  // For each FK, check that the column it references actually exists on
+  // the table it's attached to. A stale FK (e.g. renamed column) will have
+  // a constraint name that mentions the old column, but the column itself
+  // no longer exists.
+  const columnExistsCache = new Map<string, Set<string>>();
+
+  async function columnsOf(table: string): Promise<Set<string>> {
+    if (columnExistsCache.has(table)) return columnExistsCache.get(table)!;
+    const r = await client.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1`,
+      [table],
+    );
+    const cols = new Set(r.rows.map((row) => row.column_name));
+    columnExistsCache.set(table, cols);
+    return cols;
+  }
+
+  const stale: FkRow[] = [];
+  for (const fk of res.rows) {
+    const cols = await columnsOf(fk.table_name);
+    if (!cols.has(fk.column_name)) {
+      stale.push(fk);
+    }
+  }
+
+  // Also flag constraints whose name embeds a word that looks like a column
+  // name no longer present on the table (catches the postgres auto-name
+  // pattern "{table}_{old_column}_fkey" after a rename).
+  const suspicious: FkRow[] = [];
+  for (const fk of res.rows) {
+    if (stale.includes(fk)) continue; // already flagged above
+    const cols = await columnsOf(fk.table_name);
+    // Extract candidate column tokens from the constraint name by stripping
+    // the table prefix and common suffixes (_fk, _fkey, _id_fk, etc.).
+    const nameWithoutTable = fk.constraint_name
+      .replace(new RegExp(`^${fk.table_name}_`), "")
+      .replace(/_(fkey|fk)$/, "");
+    // If it looks like an old column name (contains "_") and that name
+    // doesn't exist as a column, it's suspicious.
+    if (nameWithoutTable.includes("_") && !cols.has(nameWithoutTable)) {
+      suspicious.push(fk);
+    }
+  }
+
+  console.log("\n── FK drift check ────────────────────────────────────────────");
+
+  if (stale.length === 0 && suspicious.length === 0) {
+    console.log("✓ No stale or suspicious FK constraints found.");
+    return;
+  }
+
+  if (stale.length > 0) {
+    console.error(`\n✘ ${stale.length} BROKEN FK constraint${stale.length === 1 ? "" : "s"} (column no longer exists):`);
+    for (const fk of stale) {
+      console.error(
+        `   · ${fk.table_name}.${fk.constraint_name}\n` +
+        `     column "${fk.column_name}" does not exist on "${fk.table_name}"\n` +
+        `     fix:  ALTER TABLE "${fk.table_name}" DROP CONSTRAINT IF EXISTS "${fk.constraint_name}";`,
+      );
+    }
+  }
+
+  if (suspicious.length > 0) {
+    console.warn(`\n⚠ ${suspicious.length} SUSPICIOUS FK constraint${suspicious.length === 1 ? "" : "s"} (name references a missing column):`);
+    for (const fk of suspicious) {
+      console.warn(
+        `   · ${fk.table_name}.${fk.constraint_name}\n` +
+        `     → ${fk.foreign_table_name}(${fk.foreign_column_name}) via column "${fk.column_name}"\n` +
+        `     the constraint name looks like it was created for a column that no longer exists.\n` +
+        `     verify:  \\d ${fk.table_name}   — then drop if stale.`,
+      );
+    }
+  }
+
+  if (stale.length > 0) {
+    // Broken FKs are fatal — they will cause runtime errors.
+    console.error(
+      `\n  Write a migration to drop the broken constraints above and re-run db:migrate.`,
+    );
+    process.exit(1);
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
