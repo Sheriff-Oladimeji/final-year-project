@@ -41,6 +41,8 @@ interface ChatThreadProps {
   materials: Material[];
   initialMessages: ChatMessage[];
   initialInteractionId: string | null;
+  mobileMasteryOpen?: boolean;
+  onMobileMasteryClose?: () => void;
 }
 
 const CORRECTNESS_STYLES: Record<string, { label: string; className: string }> = {
@@ -71,6 +73,8 @@ export function ChatThread({
   materials,
   initialMessages,
   initialInteractionId,
+  mobileMasteryOpen = false,
+  onMobileMasteryClose,
 }: ChatThreadProps) {
   const [text, setText] = useState("");
   const [interactionId, setInteractionId] = useState<string | null>(initialInteractionId);
@@ -272,6 +276,8 @@ export function ChatThread({
         masteryScore={masteryScore}
         tier={tier}
         recentCorrectness={recentCorrectness}
+        mobileOpen={mobileMasteryOpen}
+        onMobileClose={onMobileMasteryClose}
       />
     </div>
   );

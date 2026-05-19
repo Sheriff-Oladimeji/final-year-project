@@ -5,10 +5,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  MoreHorizontal,
   Trash2,
   Pencil,
   Loader2,
+  BookOpen,
+  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,38 +41,68 @@ export function NotebookDetail({
   initialMessages,
   initialInteractionId,
 }: NotebookDetailProps) {
+  const [mobileSources, setMobileSources] = useState(false);
+  const [mobileMastery, setMobileMastery] = useState(false);
+
   return (
-    <div className="flex flex-col h-screen px-6 py-4">
+    <div className="flex flex-col h-screen px-4 py-3 lg:px-6 lg:py-4">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2 min-w-0">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 h-8 text-muted-foreground hover:text-foreground gap-1.5">
+      <div className="flex items-center justify-between gap-2 mb-3 lg:mb-4">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {/* Mobile: Sources toggle */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="lg:hidden shrink-0 text-muted-foreground"
+            onClick={() => setMobileSources(true)}
+            title="Show sources"
+          >
+            <BookOpen className="size-4" />
+          </Button>
+
+          <Button asChild variant="ghost" size="sm" className="-ml-1 h-8 text-muted-foreground hover:text-foreground gap-1.5 shrink-0">
             <Link href="/dashboard">
               <ArrowLeft className="size-3.5" />
-              All notebooks
+              <span className="hidden sm:inline">All notebooks</span>
             </Link>
           </Button>
-          <span className="text-muted-foreground/40">/</span>
-          <h1 className="text-sm font-semibold truncate" title={notebook.title}>
+          <span className="text-muted-foreground/40 hidden sm:inline">/</span>
+          <h1 className="text-sm font-semibold truncate hidden sm:block" title={notebook.title}>
             {notebook.title}
           </h1>
         </div>
 
-        <NotebookMenu notebook={notebook} />
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Mobile: Mastery toggle */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="xl:hidden text-muted-foreground"
+            onClick={() => setMobileMastery(true)}
+            title="Show mastery"
+          >
+            <Target className="size-4" />
+          </Button>
+          <NotebookMenu notebook={notebook} />
+        </div>
       </div>
 
       {/* 3-panel layout */}
-      <div className="flex flex-1 gap-6 min-h-0">
+      <div className="flex flex-1 gap-4 lg:gap-6 min-h-0">
         <SourcesPanel
           notebookId={notebook.id}
           materials={materials}
           cap={MATERIALS_PER_NOTEBOOK_CAP}
+          mobileOpen={mobileSources}
+          onMobileClose={() => setMobileSources(false)}
         />
         <ChatThread
           notebook={notebook}
           materials={materials}
           initialMessages={initialMessages}
           initialInteractionId={initialInteractionId}
+          mobileMasteryOpen={mobileMastery}
+          onMobileMasteryClose={() => setMobileMastery(false)}
         />
       </div>
     </div>
