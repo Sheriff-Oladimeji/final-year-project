@@ -11,17 +11,17 @@ const features = [
   {
     icon: BookOpen,
     title: "Upload your materials",
-    description: "PDFs and YouTube lecture videos — indexed automatically.",
+    description: "PDFs and YouTube lecture videos — indexed and ready to chat with.",
   },
   {
     icon: BrainCircuit,
-    title: "Guided Socratic questions",
-    description: "Gemini asks you questions calibrated to your level, not give you answers.",
+    title: "Ask anything, get grounded answers",
+    description: "The AI answers directly from your sources, then gives you a Quick check to test understanding.",
   },
   {
     icon: TrendingUp,
     title: "Track your mastery",
-    description: "Score per topic rises as you answer correctly — see growth over time.",
+    description: "Every correct answer raises your topic score — watch your understanding grow over time.",
   },
 ];
 
@@ -45,18 +45,12 @@ export default async function LandingPage() {
 
         {/* ── Left: hero content ── */}
         <div className="flex flex-1 flex-col justify-center pt-16 pb-8 lg:py-0">
-          {/* Wordmark */}
-          <div className="mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-muted/60 px-4 py-1.5 text-xs font-medium text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-primary" />
-            B.Sc. Thesis — UNIOSUN Osogbo
-          </div>
-
           <h1 className="mb-4 text-5xl font-bold tracking-tight text-foreground lg:text-6xl">
             Learn<span className="text-primary">AI</span>
           </h1>
 
           <p className="mb-10 max-w-md text-lg leading-relaxed text-muted-foreground">
-            Upload your lecture materials. Ask questions. Get guided back to the answer — not given it. Your mastery score grows with every correct response.
+            Upload your lecture materials. Ask questions. Get direct answers grounded in your sources — then prove you understood with a Quick check. Your mastery score grows with every correct response.
           </p>
 
           {/* Feature list */}
