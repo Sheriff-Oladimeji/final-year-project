@@ -2,10 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { MagicLinkForm } from "@/components/auth/MagicLinkForm";
-import { BookOpen, BrainCircuit, TrendingUp, ShieldCheck } from "lucide-react";
+import { BookOpen, BrainCircuit, TrendingUp } from "lucide-react";
 
 const features = [
   {
@@ -86,17 +85,6 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          {/* Admin link */}
-          <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-            <ShieldCheck className="size-3.5" />
-            <span>Admin?</span>
-            <Link
-              href="/admin/login"
-              className="font-medium text-foreground underline underline-offset-2 transition-opacity hover:opacity-70"
-            >
-              Sign in here
-            </Link>
-          </div>
         </div>
       </div>
     </div>
