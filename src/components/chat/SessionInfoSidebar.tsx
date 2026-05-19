@@ -60,15 +60,6 @@ export function SessionInfoSidebar({
 
   const cards = (
     <>
-      {/* Notebook header */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Notebook</p>
-        <p className="text-sm font-semibold mt-2 leading-snug break-words">{notebookTitle}</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          {sourceCount} source{sourceCount === 1 ? "" : "s"}
-        </p>
-      </div>
-
       {/* Mastery */}
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Mastery</p>
