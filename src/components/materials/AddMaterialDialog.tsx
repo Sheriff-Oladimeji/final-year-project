@@ -67,9 +67,10 @@ export function AddMaterialDialog({
       if ("error" in result) {
         setPdfError(result.error ?? "Upload failed.");
       } else {
-        router.refresh();
+        // Close immediately — sidebar will show Indexing while Gemini processes
         setOpen(false);
         reset();
+        router.refresh();
       }
     } catch {
       setPdfError("Upload failed. Please try again.");
@@ -91,9 +92,10 @@ export function AddMaterialDialog({
       if ("error" in result) {
         setYoutubeError(result.error ?? "Failed to add video.");
       } else {
-        router.refresh();
+        // Close immediately — sidebar will show Indexing while Gemini processes
         setOpen(false);
         reset();
+        router.refresh();
       }
     } catch {
       setYoutubeError("Failed to add video. Check the URL and try again.");
@@ -163,7 +165,7 @@ export function AddMaterialDialog({
               {uploadingPdf ? (
                 <>
                   <Loader2 className="size-5 animate-spin" />
-                  <span>Uploading and indexing…</span>
+                  <span>Uploading…</span>
                 </>
               ) : (
                 <>

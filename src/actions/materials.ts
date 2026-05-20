@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
@@ -60,6 +61,7 @@ export async function uploadPdfAction(formData: FormData) {
     return { error: "Please upload a valid PDF file." };
   }
 
+  // Create pending record immediately — close dialog fast
   const material = await createMaterial({
     userId: session.user.id,
     notebookId,
@@ -68,21 +70,25 @@ export async function uploadPdfAction(formData: FormData) {
     sourceUri: file.name,
   });
 
-  try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const fileSearchId = await uploadBytes(buffer, "application/pdf", file.name);
+  revalidatePath(`/notebooks/${notebookId}`);
 
-    await setMaterialStatus(material.id, "ready", { fileSearchId, indexedAt: new Date() });
-    await touchNotebook(notebookId, session.user.id);
+  // Upload to Gemini after response is sent
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const materialId = material.id;
+  const userId = session.user.id;
 
-    void persistSuggestions(material.id, session.user.id);
+  after(async () => {
+    try {
+      const fileSearchId = await uploadBytes(buffer, "application/pdf", file.name);
+      await setMaterialStatus(materialId, "ready", { fileSearchId, indexedAt: new Date() });
+      await touchNotebook(notebookId, userId);
+      void persistSuggestions(materialId, userId);
+    } catch {
+      await setMaterialStatus(materialId, "failed");
+    }
+  });
 
-    revalidatePath(`/notebooks/${notebookId}`);
-    return { data: { id: material.id, status: "ready" } };
-  } catch (err: unknown) {
-    await setMaterialStatus(material.id, "failed");
-    return { error: err instanceof Error ? err.message : "Upload failed." };
-  }
+  return { data: { id: materialId, status: "pending" } };
 }
 
 export async function submitYoutubeAction(formData: FormData) {
@@ -98,42 +104,49 @@ export async function submitYoutubeAction(formData: FormData) {
   if (!url) return { error: "Please provide a YouTube URL." };
 
   let videoId: string;
+  let title: string;
   let transcriptText: string;
   try {
     const result = await fetchTranscript(url);
     videoId = result.videoId;
+    title = result.title;
     transcriptText = result.text;
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : "Failed to fetch transcript." };
   }
 
-  const displayName = `YouTube: ${videoId}`;
+  // Create pending record immediately — close dialog fast
   const material = await createMaterial({
     userId: session.user.id,
     notebookId,
     kind: "youtube",
-    displayName,
+    displayName: title,
     sourceUri: url,
     content: transcriptText,
   });
 
-  try {
-    const fileSearchId = await uploadBytes(
-      Buffer.from(transcriptText, "utf-8"),
-      "text/plain",
-      displayName,
-    );
-    await setMaterialStatus(material.id, "ready", { fileSearchId, indexedAt: new Date() });
-    await touchNotebook(notebookId, session.user.id);
+  revalidatePath(`/notebooks/${notebookId}`);
 
-    void persistSuggestions(material.id, session.user.id);
+  const materialId = material.id;
+  const userId = session.user.id;
 
-    revalidatePath(`/notebooks/${notebookId}`);
-    return { data: { id: material.id, status: "ready" } };
-  } catch (err: unknown) {
-    await setMaterialStatus(material.id, "failed");
-    return { error: err instanceof Error ? err.message : "Upload failed." };
-  }
+  // Upload to Gemini after response is sent
+  after(async () => {
+    try {
+      const fileSearchId = await uploadBytes(
+        Buffer.from(transcriptText, "utf-8"),
+        "text/plain",
+        title,
+      );
+      await setMaterialStatus(materialId, "ready", { fileSearchId, indexedAt: new Date() });
+      await touchNotebook(notebookId, userId);
+      void persistSuggestions(materialId, userId);
+    } catch {
+      await setMaterialStatus(materialId, "failed");
+    }
+  });
+
+  return { data: { id: materialId, status: "pending" } };
 }
 
 export async function deleteMaterialAction(materialId: string) {

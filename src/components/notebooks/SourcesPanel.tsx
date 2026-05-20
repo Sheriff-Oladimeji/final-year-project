@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -36,9 +36,18 @@ interface SourcesPanelProps {
 }
 
 export function SourcesPanel({ notebookId, materials, cap, mobileOpen = false, onMobileClose }: SourcesPanelProps) {
+  const router = useRouter();
   const count = materials.length;
   const atCap = count >= cap;
   const [collapsed, setCollapsed] = useState(false);
+
+  // Poll every 3 s while any source is still indexing
+  const hasPending = materials.some((m) => m.status === "pending");
+  useEffect(() => {
+    if (!hasPending) return;
+    const id = setInterval(() => router.refresh(), 3000);
+    return () => clearInterval(id);
+  }, [hasPending, router]);
 
   const panelContent = (
     <>
