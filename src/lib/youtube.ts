@@ -21,11 +21,16 @@ function secondsToMmss(seconds: number): string {
   return `[${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}]`;
 }
 
-interface TranscriptSegment {
-  text: string;
-  start?: number;
-  offset?: number;
-  duration?: number;
+interface RawSegment {
+  text: unknown;
+  offset?: unknown; // API returns this as a string e.g. "0.08"
+  start?: unknown;
+  duration?: unknown;
+}
+
+interface RapidApiResponse {
+  success?: boolean;
+  transcript?: RawSegment[];
 }
 
 export async function fetchTranscript(url: string): Promise<{ videoId: string; text: string }> {
@@ -49,19 +54,25 @@ export async function fetchTranscript(url: string): Promise<{ videoId: string; t
     throw new Error(`Transcript API returned ${res.status} for video ${videoId}.`);
   }
 
-  const data = await res.json() as TranscriptSegment[] | { transcript: TranscriptSegment[] };
+  const data = await res.json() as RapidApiResponse | RawSegment[];
 
-  // API returns either a plain array or { transcript: [...] }
-  const segments: TranscriptSegment[] = Array.isArray(data) ? data : data.transcript ?? [];
+  // Handles both { success, transcript: [...] } and a plain array
+  const segments: RawSegment[] = Array.isArray(data)
+    ? data
+    : (data as RapidApiResponse).transcript ?? [];
 
   if (segments.length === 0) {
-    throw new Error(`No transcript available for video ${videoId}. It may be disabled or unavailable.`);
+    throw new Error(
+      `No transcript available for video ${videoId}. Captions may be disabled on this video.`,
+    );
   }
 
   const parts = segments.map((seg) => {
-    const seconds = seg.start ?? seg.offset ?? 0;
-    const timestamp = secondsToMmss(seconds);
-    const text = seg.text.trim().replace(/\n/g, " ");
+    // offset comes back as a string from this API e.g. "0.08"
+    const rawOffset = seg.start ?? seg.offset ?? 0;
+    const seconds = typeof rawOffset === "string" ? parseFloat(rawOffset) : Number(rawOffset);
+    const timestamp = secondsToMmss(isNaN(seconds) ? 0 : seconds);
+    const text = String(seg.text ?? "").trim().replace(/\n/g, " ");
     return `${timestamp} ${text}`;
   });
 
