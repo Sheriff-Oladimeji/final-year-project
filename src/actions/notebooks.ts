@@ -11,7 +11,6 @@ import {
   getNotebook,
 } from "@/db/queries/notebooks";
 import { listMaterialsByNotebook } from "@/db/queries/materials";
-import { deleteFile } from "@/lib/uploads";
 import { deleteGeminiFile } from "@/lib/gemini/files";
 
 async function requireUser() {
@@ -55,11 +54,10 @@ export async function deleteNotebookAction(notebookId: string) {
   const nb = await getNotebook(notebookId, session.user.id);
   if (!nb) return { error: "Notebook not found." };
 
-  // Clean up Gemini files + local disk before the cascade delete.
+  // Clean up Gemini files before the cascade delete.
   const materials = await listMaterialsByNotebook(session.user.id, notebookId);
   for (const m of materials) {
     if (m.fileSearchId) await deleteGeminiFile(m.fileSearchId);
-    if (m.localPath) await deleteFile(m.localPath);
   }
 
   await deleteNotebook(notebookId, session.user.id);

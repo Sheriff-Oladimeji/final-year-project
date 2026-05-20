@@ -9,19 +9,10 @@ export async function uploadBytes(
   displayName: string,
 ): Promise<string> {
   const client = getClient();
-  const blob = new Blob([content.buffer as ArrayBuffer], { type: mimeType });
+  const arrayBuffer = content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) as ArrayBuffer;
+  const blob = new Blob([arrayBuffer], { type: mimeType });
   const file = await client.files.upload({ file: blob, config: { mimeType, displayName } });
   return file.name!;
-}
-
-export async function uploadFromPath(
-  localPath: string,
-  mimeType: string,
-  displayName: string,
-): Promise<string> {
-  const fs = await import("fs/promises");
-  const buffer = await fs.readFile(localPath);
-  return uploadBytes(buffer, mimeType, displayName);
 }
 
 export async function checkFileActive(fileSearchId: string): Promise<boolean> {
@@ -66,23 +57,23 @@ export async function getActiveFiles(
     const isActive = await checkFileActive(fileId);
 
     if (!isActive) {
+      // PDFs have no local backup — re-upload from stored transcript for YouTube only
       try {
-        if (material.kind === "pdf" && material.localPath) {
-          fileId = await uploadFromPath(material.localPath, "application/pdf", material.displayName);
-        } else if (material.kind === "youtube" && material.content) {
+        if (material.kind === "youtube" && material.content) {
           fileId = await uploadBytes(
             Buffer.from(material.content, "utf-8"),
             "text/plain",
             material.displayName,
           );
+          await setMaterialStatus(material.id, "ready", {
+            fileSearchId: fileId,
+            indexedAt: new Date(),
+          });
         } else {
+          // PDF with expired Gemini file — mark failed so the student knows to re-add it
           await setMaterialStatus(material.id, "failed");
           continue;
         }
-        await setMaterialStatus(material.id, "ready", {
-          fileSearchId: fileId,
-          indexedAt: new Date(),
-        });
       } catch {
         continue;
       }

@@ -13,9 +13,8 @@ import {
   MATERIALS_PER_NOTEBOOK_CAP,
 } from "@/db/queries/materials";
 import { getNotebook, touchNotebook } from "@/db/queries/notebooks";
-import { saveFile, deleteFile } from "@/lib/uploads";
 import { fetchTranscript } from "@/lib/youtube";
-import { uploadBytes, uploadFromPath, deleteGeminiFile } from "@/lib/gemini/files";
+import { uploadBytes, deleteGeminiFile } from "@/lib/gemini/files";
 import { generateMaterialSuggestions } from "@/lib/ai/suggestions";
 
 async function requireUser() {
@@ -71,8 +70,7 @@ export async function uploadPdfAction(formData: FormData) {
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const localPath = await saveFile(session.user.id, material.id, buffer);
-    const fileSearchId = await uploadFromPath(localPath, "application/pdf", file.name);
+    const fileSearchId = await uploadBytes(buffer, "application/pdf", file.name);
 
     await setMaterialStatus(material.id, "ready", { fileSearchId, indexedAt: new Date() });
     await touchNotebook(notebookId, session.user.id);
@@ -146,7 +144,6 @@ export async function deleteMaterialAction(materialId: string) {
   if (!material) return { error: "Material not found." };
 
   if (material.fileSearchId) await deleteGeminiFile(material.fileSearchId);
-  if (material.localPath) await deleteFile(material.localPath);
 
   await deleteMaterial(materialId, session.user.id);
   revalidatePath(`/notebooks/${material.notebookId}`);
