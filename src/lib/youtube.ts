@@ -1,5 +1,3 @@
-import { YoutubeTranscript } from "youtube-transcript";
-
 const WATCH_RE = /[?&]v=([A-Za-z0-9_-]{11})/;
 const SHORT_RE = /youtu\.be\/([A-Za-z0-9_-]{11})/;
 
@@ -23,20 +21,47 @@ function secondsToMmss(seconds: number): string {
   return `[${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}]`;
 }
 
+interface TranscriptSegment {
+  text: string;
+  start?: number;
+  offset?: number;
+  duration?: number;
+}
+
 export async function fetchTranscript(url: string): Promise<{ videoId: string; text: string }> {
   const videoId = extractVideoId(url);
+  const apiKey = process.env.RAPIDAPI_KEY;
+  if (!apiKey) throw new Error("RAPIDAPI_KEY is not configured.");
 
-  let entries: { text: string; offset: number; duration: number }[];
-  try {
-    entries = await YoutubeTranscript.fetchTranscript(videoId);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Failed to fetch transcript for video ${videoId}: ${msg}`);
+  const res = await fetch(
+    `https://youtube-transcript3.p.rapidapi.com/api/transcript?videoId=${videoId}`,
+    {
+      method: "GET",
+      headers: {
+        "x-rapidapi-key": apiKey,
+        "x-rapidapi-host": "youtube-transcript3.p.rapidapi.com",
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(`Transcript API returned ${res.status} for video ${videoId}.`);
   }
 
-  const parts = entries.map((e) => {
-    const timestamp = secondsToMmss(e.offset / 1000);
-    const text = e.text.trim().replace(/\n/g, " ");
+  const data = await res.json() as TranscriptSegment[] | { transcript: TranscriptSegment[] };
+
+  // API returns either a plain array or { transcript: [...] }
+  const segments: TranscriptSegment[] = Array.isArray(data) ? data : data.transcript ?? [];
+
+  if (segments.length === 0) {
+    throw new Error(`No transcript available for video ${videoId}. It may be disabled or unavailable.`);
+  }
+
+  const parts = segments.map((seg) => {
+    const seconds = seg.start ?? seg.offset ?? 0;
+    const timestamp = secondsToMmss(seconds);
+    const text = seg.text.trim().replace(/\n/g, " ");
     return `${timestamp} ${text}`;
   });
 
