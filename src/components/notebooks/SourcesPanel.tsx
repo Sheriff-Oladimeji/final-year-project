@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
-  Video,
   Trash2,
   Loader2,
   XCircle,
@@ -202,25 +201,16 @@ function SourceRow({ material }: { material: Material }) {
 
   return (
     <li className="group flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/60 transition-colors">
-      {/* Kind badge — matches NotebookLM's colored icon tiles */}
-      <div className={cn(
-        "size-9 shrink-0 rounded-lg flex flex-col items-center justify-center gap-0.5",
-        material.kind === "pdf"
-          ? "bg-red-100 dark:bg-red-900/30"
-          : "bg-red-100 dark:bg-red-900/30",
-      )}>
-        {material.kind === "pdf" ? (
-          <>
-            <FileText className="size-4 text-red-600 dark:text-red-400" />
-            <span className="text-[8px] font-bold text-red-600 dark:text-red-400 leading-none">PDF</span>
-          </>
-        ) : (
-          <>
-            <Video className="size-4 text-red-600 dark:text-red-400" />
-            <span className="text-[8px] font-bold text-red-600 dark:text-red-400 leading-none">YT</span>
-          </>
-        )}
-      </div>
+      {material.kind === "pdf" ? (
+        <div className="size-9 shrink-0 rounded-lg flex flex-col items-center justify-center gap-0.5 bg-red-100 dark:bg-red-900/30">
+          <FileText className="size-4 text-red-600 dark:text-red-400" />
+          <span className="text-[8px] font-bold text-red-600 dark:text-red-400 leading-none">PDF</span>
+        </div>
+      ) : (
+        <div className="size-9 shrink-0 rounded-lg flex items-center justify-center bg-red-100 dark:bg-red-900/30">
+          <YouTubeIcon />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium leading-snug truncate" title={material.display_name}>
           {material.display_name}
@@ -280,5 +270,17 @@ function StatusBadge({ status }: { status: Material["status"] }) {
       <XCircle className="size-2.5" />
       Failed
     </Badge>
+  );
+}
+
+function YouTubeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+      <path
+        fill="#FF0000"
+        d="M23.5 6.2a3.01 3.01 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3.01 3.01 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3.01 3.01 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3.01 3.01 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8z"
+      />
+      <path fill="#fff" d="M9.6 15.6V8.4l6.3 3.6-6.3 3.6z" />
+    </svg>
   );
 }
