@@ -82,7 +82,7 @@ export async function uploadPdfAction(formData: FormData) {
       const fileSearchId = await uploadBytes(buffer, "application/pdf", file.name);
       await setMaterialStatus(materialId, "ready", { fileSearchId, indexedAt: new Date() });
       await touchNotebook(notebookId, userId);
-      void persistSuggestions(materialId, userId);
+      await persistSuggestions(materialId, userId);
     } catch {
       await setMaterialStatus(materialId, "failed");
     }
@@ -140,7 +140,7 @@ export async function submitYoutubeAction(formData: FormData) {
       );
       await setMaterialStatus(materialId, "ready", { fileSearchId, indexedAt: new Date() });
       await touchNotebook(notebookId, userId);
-      void persistSuggestions(materialId, userId);
+      await persistSuggestions(materialId, userId);
     } catch {
       await setMaterialStatus(materialId, "failed");
     }

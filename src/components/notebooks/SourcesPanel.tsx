@@ -41,13 +41,23 @@ export function SourcesPanel({ notebookId, materials, cap, mobileOpen = false, o
   const atCap = count >= cap;
   const [collapsed, setCollapsed] = useState(false);
 
-  // Poll every 3 s while any source is still indexing
-  const hasPending = materials.some((m) => m.status === "pending");
+  // Poll every 3 s while any source is indexing or ready-but-no-suggestions yet.
+  // Cap at 20 polls (~60 s) to prevent infinite loops if suggestion generation fails.
+  const [pollCount, setPollCount] = useState(0);
+  const shouldPoll = materials.some(
+    (m) => m.status === "pending" || (m.status === "ready" && m.suggestions.length === 0),
+  );
   useEffect(() => {
-    if (!hasPending) return;
-    const id = setInterval(() => router.refresh(), 3000);
+    if (!shouldPoll || pollCount >= 20) return;
+    const id = setInterval(() => {
+      router.refresh();
+      setPollCount((c) => c + 1);
+    }, 3000);
     return () => clearInterval(id);
-  }, [hasPending, router]);
+  }, [shouldPoll, pollCount, router]);
+  // Reset cap when new materials arrive so fresh additions always get a full polling window
+  const materialIds = materials.map((m) => m.id).join(",");
+  useEffect(() => { setPollCount(0); }, [materialIds]);
 
   const panelContent = (
     <>
