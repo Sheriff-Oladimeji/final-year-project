@@ -314,7 +314,15 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
     }
   }
 
-  const text = textChunks.join("").replace(/\[source:[^\]]*\]/gi, "").replace(/\s{2,}/g, " ").trim();
+  const fullText = textChunks.join("").replace(/\[source:[^\]]*\]/gi, "").replace(/\s{2,}/g, " ").trim();
+
+  // Split "Quick check: …" from the body so we can render it as a callout
+  const quickCheckMatch = fullText.match(/Quick check:\s*([\s\S]+)$/i);
+  const bodyText = quickCheckMatch
+    ? fullText.slice(0, fullText.length - quickCheckMatch[0].length).trim()
+    : fullText;
+  const quickCheckQuestion = quickCheckMatch ? quickCheckMatch[1].trim() : null;
+
   const correctnessStyle = score ? CORRECTNESS_STYLES[score.correctness] : null;
 
   return (
@@ -345,12 +353,21 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
         )}
 
         <MessageContent className="border-l-2 border-primary/40 pl-4">
-          {text ? (
-            <MessageResponse>{text}</MessageResponse>
-          ) : (
+          {bodyText ? (
+            <MessageResponse>{bodyText}</MessageResponse>
+          ) : !quickCheckQuestion ? (
             <span className="text-sm text-muted-foreground">Thinking…</span>
-          )}
+          ) : null}
         </MessageContent>
+
+        {quickCheckQuestion && (
+          <div className="border-t border-border/60 pt-3 mt-1">
+            <p className="text-sm text-foreground leading-snug">
+              <span className="text-muted-foreground">Quick check — </span>
+              {quickCheckQuestion}
+            </p>
+          </div>
+        )}
 
         {citations.length > 0 && (
           <Sources>
