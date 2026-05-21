@@ -16,6 +16,7 @@ import {
   CLASSIFY_TOPIC_TEMPLATE,
   RETRIEVE_PROMPT,
   DIRECT_ANSWER_TEMPLATE,
+  AFTER_CORRECT_TEMPLATE,
   REVEAL_TEMPLATE,
   CLASSIFY_CHECK_TEMPLATE,
   INTENT_CLASSIFIER_TEMPLATE,
@@ -324,9 +325,16 @@ export async function POST(req: Request) {
           updateInteraction(interaction.id, userId, { studentReply: userText, correctness, scoreDelta: delta }),
         ]);
 
-        const prompt = DIRECT_ANSWER_TEMPLATE(
-          interaction.question, contextText, topic.name, conversation, notebookTitle, newTier,
-        );
+        const isCorrect = correctness === "correct" || correctness === "correct_with_hint";
+        const prompt = isCorrect
+          ? AFTER_CORRECT_TEMPLATE(
+              interaction.question, userText, contextText, topic.name,
+              conversation, notebookTitle, newTier, correctness === "correct_with_hint",
+            )
+          : DIRECT_ANSWER_TEMPLATE(
+              interaction.question, contextText, topic.name, conversation, notebookTitle, newTier,
+            );
+
         const result = streamText({
           model: geminiModel,
           messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...fileParts] }],
@@ -338,7 +346,7 @@ export async function POST(req: Request) {
           createInteraction({
             userId, sessionId, notebookId, topicId: topic.id,
             question: interaction.question, retrievedContext: contextText,
-            promptTemplate: "answer", response: text,
+            promptTemplate: isCorrect ? "progress" : "answer", response: text,
           }),
           generateFollowups(topic.name, newTier, text, true),
         ]);
