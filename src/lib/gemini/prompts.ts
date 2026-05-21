@@ -13,42 +13,22 @@ Reply with only a short topic label of 2 to 5 words (e.g. "binary search trees",
 "TCP/IP model", "merge sort complexity"). No punctuation. No explanation.
 `;
 
-// ── Source retrieval (multi-material) ──────────────────────────────────────
-
-export const RETRIEVE_PROMPT = (question: string) => `\
-You are a research assistant. The student has asked: ${question}
-
-Using ONLY the attached course materials, identify and quote the most relevant
-passages (up to 5). For each, state which source it comes from.
-
-Format your response as repeated blocks of:
-SOURCE: [exact material name shown in the attached files]
-EXCERPT: [the relevant passage, verbatim, kept short]
-
-If no relevant material is found across any source, reply with:
-NO_RELEVANT_CONTENT
-`;
-
 // ── The main answer template — used for every fresh ask ────────────────────
 
 export const DIRECT_ANSWER_TEMPLATE = (
   question: string,
-  context: string,
   topic: string,
   conversation: string,
   notebookTitle: string,
   tier: "recall" | "application" | "analysis" = "recall",
 ) => `\
 You are a smart AI tutor for the notebook "${notebookTitle}".
-Answer ONLY from the attached source materials. Never invent facts.
-If the sources don't cover the topic, say so in one sentence and suggest adding a relevant source.
+Search the course materials and answer ONLY from what you find. Never invent facts.
+If the materials don't cover the topic, say so in one sentence and suggest adding a relevant source.
 
 Topic: ${topic} | Mastery tier: ${tier}
 ${conversation ? `\nConversation so far (for context — do NOT repeat a Quick check already asked):\n${conversation}\n` : ""}
 Student asked: ${question}
-
-Relevant source excerpts:
-${context}
 
 ━━━ STEP 1 — PREREQUISITE CHECK (do this before anything else) ━━━
 Does this question require understanding a specific foundational concept that has
@@ -121,16 +101,13 @@ Reply with ONLY the label. No explanation, no punctuation.
 // ── Scoring a check reply ───────────────────────────────────────────────────
 
 export const CLASSIFY_CHECK_TEMPLATE = (
-  checkQuestion: string,
-  context: string,
+  previousTutorResponse: string,
   studentReply: string,
 ) => `\
-You are evaluating a student's answer to a Quick-check comprehension question.
+You are evaluating a student's answer to the Quick check at the end of the tutor's response.
 
-Quick check: ${checkQuestion}
-
-Source material this check was based on:
-${context}
+The tutor said:
+${previousTutorResponse}
 
 Student's reply: ${studentReply}
 
@@ -149,7 +126,6 @@ No explanation.
 export const AFTER_CORRECT_TEMPLATE = (
   originalQuestion: string,
   studentAnswer: string,
-  context: string,
   topic: string,
   conversation: string,
   notebookTitle: string,
@@ -159,14 +135,12 @@ export const AFTER_CORRECT_TEMPLATE = (
 ) => `\
 You are a smart AI tutor for "${notebookTitle}".
 The student just answered a Quick check ${wasHint ? "mostly correctly (they needed a small hint)" : "correctly"}.
+Search the course materials to ground your response.
 
 Original question: ${originalQuestion}
 Student's answer: ${studentAnswer}
 Topic: ${topic} | Mastery score: ${masteryScore}/100 | Tier: ${tier}
 ${conversation ? `\nConversation so far:\n${conversation}\n` : ""}
-
-Source material (use ONLY this — never invent facts):
-${context}
 
 ━━━ YOUR TASK — DO NOT RE-EXPLAIN WHAT THEY ALREADY KNOW ━━━
 
@@ -174,7 +148,7 @@ ${wasHint
   ? "The student is mostly there but slightly shaky. Anchor the concept from a fresh angle, then add a small extension. Use the same breakdown style: analogy → example → key term."
   : `The student demonstrated understanding. Move them forward.
 
-COVERAGE CHECK (do this silently): Look at the conversation above and the source material attached.
+COVERAGE CHECK (do this silently): Look at the conversation above and the course material.
 - Has the student now engaged with and correctly answered questions about the core ideas of "${topic}" as covered in the material — the definition, how it works, and why it matters?
 - ${masteryScore >= 45 ? `Yes (score ${masteryScore}/100 — they've answered multiple checks correctly):` : `Not yet (score ${masteryScore}/100 — too early to suggest moving on):`}
   ${masteryScore >= 45
@@ -206,18 +180,15 @@ No emojis. No "Great job!" or "Excellent!". No apologies.
 // ── Give-up → reveal answer + new check ─────────────────────────────────────
 
 export const REVEAL_TEMPLATE = (
-  checkQuestion: string,
-  context: string,
+  previousTutorResponse: string,
   topic: string,
   notebookTitle: string,
 ) => `\
 The student gave up on a Quick check in their notebook "${notebookTitle}". Reveal
-the answer concisely and move them forward.
+the answer and move them forward. Search the course materials to ground your response.
 
-Quick check they couldn't answer: ${checkQuestion}
-
-Source material:
-${context}
+The tutor's previous response (contains the Quick check they couldn't answer):
+${previousTutorResponse}
 
 Topic: ${topic}
 
@@ -283,8 +254,8 @@ Rules:
 // ── Per-material starter suggestions (used on first chat with a source) ────
 
 export const SUGGESTIONS_PROMPT = `\
-You are creating starter questions for a learning session about the attached
-course material.
+You are creating starter questions for a learning session about the course
+material in this notebook.
 
 Generate exactly 4 short, distinct questions a student might ask to understand
 this material better. Cover different angles: definition, mechanism, application,

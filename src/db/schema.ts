@@ -70,11 +70,12 @@ export const verification = pgTable("verification", {
 export const notebooks = pgTable(
   "notebooks",
   {
-    id:        uuid("id").primaryKey().defaultRandom(),
-    userId:    text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    title:     varchar("title", { length: 255 }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    id:                  uuid("id").primaryKey().defaultRandom(),
+    userId:              text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    title:               varchar("title", { length: 255 }).notNull(),
+    fileSearchStoreName: text("file_search_store_name"),
+    createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt:           timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("notebooks_user_id_idx").on(t.userId)],
 );

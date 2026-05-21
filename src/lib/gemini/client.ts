@@ -6,7 +6,10 @@ const globalForGenAI = globalThis as unknown as { _genai?: GoogleGenAI };
 
 export function getClient(): GoogleGenAI {
   if (!globalForGenAI._genai) {
-    globalForGenAI._genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+    globalForGenAI._genai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY!,
+      httpOptions: { timeout: 120_000 }, // 2 min hard cap — prevents indefinite hangs on upload/delete
+    });
   }
   return globalForGenAI._genai;
 }

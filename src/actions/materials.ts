@@ -15,7 +15,7 @@ import {
 } from "@/db/queries/materials";
 import { getNotebook, touchNotebook } from "@/db/queries/notebooks";
 import { fetchTranscript } from "@/lib/youtube";
-import { uploadBytes, deleteGeminiFile } from "@/lib/gemini/files";
+import { uploadDocumentToStore, deleteDocumentFromStore } from "@/lib/gemini/fileSearch";
 import { generateMaterialSuggestions } from "@/lib/ai/suggestions";
 
 async function requireUser() {
@@ -29,6 +29,7 @@ async function requireUser() {
 async function checkCanAddMaterial(userId: string, notebookId: string) {
   const nb = await getNotebook(notebookId, userId);
   if (!nb) return { error: "Notebook not found." } as const;
+  if (!nb.fileSearchStoreName) return { error: "This notebook's file store isn't ready yet." } as const;
   const existing = await countMaterialsInNotebook(userId, notebookId);
   if (existing >= MATERIALS_PER_NOTEBOOK_CAP) {
     return {
@@ -61,7 +62,9 @@ export async function uploadPdfAction(formData: FormData) {
     return { error: "Please upload a valid PDF file." };
   }
 
-  // Create pending record immediately — close dialog fast
+  const nb = await getNotebook(notebookId, session.user.id);
+  const storeName = nb!.fileSearchStoreName!;
+
   const material = await createMaterial({
     userId: session.user.id,
     notebookId,
@@ -72,18 +75,18 @@ export async function uploadPdfAction(formData: FormData) {
 
   revalidatePath(`/notebooks/${notebookId}`);
 
-  // Upload to Gemini after response is sent
   const buffer = Buffer.from(await file.arrayBuffer());
   const materialId = material.id;
   const userId = session.user.id;
 
   after(async () => {
     try {
-      const fileSearchId = await uploadBytes(buffer, "application/pdf", file.name);
-      await setMaterialStatus(materialId, "ready", { fileSearchId, indexedAt: new Date() });
+      const documentName = await uploadDocumentToStore(storeName, buffer, "application/pdf", file.name);
+      await setMaterialStatus(materialId, "ready", { fileSearchId: documentName, indexedAt: new Date() });
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
-    } catch {
+    } catch (err) {
+      console.error("[uploadPdfAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");
     }
   });
@@ -115,7 +118,9 @@ export async function submitYoutubeAction(formData: FormData) {
     return { error: err instanceof Error ? err.message : "Failed to fetch transcript." };
   }
 
-  // Create pending record immediately — close dialog fast
+  const nb = await getNotebook(notebookId, session.user.id);
+  const storeName = nb!.fileSearchStoreName!;
+
   const material = await createMaterial({
     userId: session.user.id,
     notebookId,
@@ -130,18 +135,19 @@ export async function submitYoutubeAction(formData: FormData) {
   const materialId = material.id;
   const userId = session.user.id;
 
-  // Upload to Gemini after response is sent
   after(async () => {
     try {
-      const fileSearchId = await uploadBytes(
+      const documentName = await uploadDocumentToStore(
+        storeName,
         Buffer.from(transcriptText, "utf-8"),
         "text/plain",
         title,
       );
-      await setMaterialStatus(materialId, "ready", { fileSearchId, indexedAt: new Date() });
+      await setMaterialStatus(materialId, "ready", { fileSearchId: documentName, indexedAt: new Date() });
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
-    } catch {
+    } catch (err) {
+      console.error("[submitYoutubeAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");
     }
   });
@@ -156,7 +162,9 @@ export async function deleteMaterialAction(materialId: string) {
   const material = await getMaterial(materialId, session.user.id);
   if (!material) return { error: "Material not found." };
 
-  if (material.fileSearchId) await deleteGeminiFile(material.fileSearchId);
+  if (material.fileSearchId) {
+    await deleteDocumentFromStore(material.fileSearchId);
+  }
 
   await deleteMaterial(materialId, session.user.id);
   revalidatePath(`/notebooks/${material.notebookId}`);

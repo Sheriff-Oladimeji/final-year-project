@@ -6,10 +6,11 @@ import type { Notebook } from "@/db/schema";
 export async function createNotebook(data: {
   userId: string;
   title: string;
+  fileSearchStoreName?: string;
 }): Promise<Notebook> {
   const rows = await db
     .insert(notebooks)
-    .values({ userId: data.userId, title: data.title })
+    .values({ userId: data.userId, title: data.title, fileSearchStoreName: data.fileSearchStoreName })
     .returning();
   return rows[0];
 }

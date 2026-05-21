@@ -1,4 +1,7 @@
 export const dynamic = "force-dynamic";
+// Needed so after() callbacks (Gemini file upload) survive on Vercel.
+// Requires Fluid Compute to be enabled in the Vercel dashboard (free on all plans).
+export const maxDuration = 300;
 
 import { redirect, notFound } from "next/navigation";
 import { headers } from "next/headers";

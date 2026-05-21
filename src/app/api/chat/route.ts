@@ -7,14 +7,13 @@ import {
   generateText,
   streamText,
 } from "ai";
+import { google } from "@ai-sdk/google";
 import { auth } from "@/lib/auth";
 import { geminiModel, NO_THINKING } from "@/lib/ai/model";
-import { buildFileContentParts } from "@/lib/ai/file-parts";
 import { buildConversationContext } from "@/lib/ai/conversation";
 import type { ChatMessage } from "@/lib/ai/chat-types";
 import {
   CLASSIFY_TOPIC_TEMPLATE,
-  RETRIEVE_PROMPT,
   DIRECT_ANSWER_TEMPLATE,
   AFTER_CORRECT_TEMPLATE,
   REVEAL_TEMPLATE,
@@ -40,7 +39,7 @@ import { db } from "@/db";
 import { topics } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getMasteryTier, scoreDelta, clipScore } from "@/lib/mastery";
-import type { Citation, Correctness } from "@/types";
+import type { Correctness } from "@/types";
 
 export const maxDuration = 60;
 
@@ -107,47 +106,6 @@ function parseCorrectness(raw: string): Correctness {
     : "incorrect") as Correctness;
 }
 
-function parseRetrieved(raw: string): { contextText: string; citations: Citation[] } {
-  if (raw.includes("NO_RELEVANT_CONTENT")) {
-    return { contextText: "No directly relevant material found.", citations: [] };
-  }
-  const citations: Citation[] = [];
-  const contextParts: string[] = [];
-  let currentSource = "";
-  let currentExcerptLines: string[] = [];
-
-  for (const rawLine of raw.split("\n")) {
-    const line = rawLine.trim();
-    if (line.startsWith("SOURCE:")) {
-      if (currentSource && currentExcerptLines.length > 0) {
-        const excerpt = currentExcerptLines.join(" ").trim();
-        citations.push({ source: currentSource, excerpt });
-        contextParts.push(`[${currentSource}] ${excerpt}`);
-        currentExcerptLines = [];
-      }
-      currentSource = line.slice("SOURCE:".length).trim();
-    } else if (line.startsWith("EXCERPT:")) {
-      currentExcerptLines = [line.slice("EXCERPT:".length).trim()];
-    } else if (line && currentExcerptLines.length > 0) {
-      currentExcerptLines.push(line);
-    }
-  }
-
-  if (currentSource && currentExcerptLines.length > 0) {
-    const excerpt = currentExcerptLines.join(" ").trim();
-    citations.push({ source: currentSource, excerpt });
-    contextParts.push(`[${currentSource}] ${excerpt}`);
-  }
-
-  if (citations.length === 0) {
-    return {
-      contextText: raw,
-      citations: [{ source: "course material", excerpt: raw.slice(0, 500) }],
-    };
-  }
-  return { contextText: contextParts.join("\n\n"), citations };
-}
-
 const SuggestionsSchema = z.object({ suggestions: z.array(z.string()).min(1).max(5) });
 
 const DEFAULT_CHECK_SUGGESTIONS = ["i don't know", "show me the answer", "give me a hint"];
@@ -183,7 +141,7 @@ export async function POST(req: Request) {
   let notebookId: string;
   let interactionId: string | undefined;
   let notebookTitle: string;
-  let fileParts: Awaited<ReturnType<typeof buildFileContentParts>>;
+  let fileSearchStoreName: string;
   let priorInteraction: Awaited<ReturnType<typeof getInteraction>> | null;
   let intent: Intent;
   let conversation = "";
@@ -205,7 +163,6 @@ export async function POST(req: Request) {
     userId = session.user.id;
     sessionId = session.session.id;
 
-    // Run all independent DB queries in parallel
     const [notebook, materials, priorInteractionRaw, recentInteractions] = await Promise.all([
       getNotebook(notebookId, userId),
       listReadyMaterialsInNotebook(userId, notebookId),
@@ -214,6 +171,9 @@ export async function POST(req: Request) {
     ]);
 
     if (!notebook) return new Response("Notebook not found", { status: 404 });
+    if (!notebook.fileSearchStoreName) {
+      return new Response("Notebook file store is not ready yet.", { status: 400 });
+    }
     if (materials.length === 0) {
       return new Response(
         "This notebook has no ready sources yet. Add at least one PDF or YouTube link first.",
@@ -222,15 +182,12 @@ export async function POST(req: Request) {
     }
 
     notebookTitle = notebook.title;
+    fileSearchStoreName = notebook.fileSearchStoreName;
     priorInteraction = priorInteractionRaw;
     conversation = buildConversationContext(recentInteractions, 6);
     const lastGuidedQuestion = priorInteraction?.response ?? null;
 
-    // File prep and intent classification are independent — run in parallel
-    [fileParts, intent] = await Promise.all([
-      buildFileContentParts(materials),
-      classifyIntent(userText, lastGuidedQuestion),
-    ]);
+    intent = await classifyIntent(userText, lastGuidedQuestion);
 
     if (
       intent === "answer_attempt" &&
@@ -245,6 +202,8 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? `${err.name}: ${err.message}` : "Server error";
     return new Response(message, { status: 500 });
   }
+
+  const fsTools = { file_search: google.tools.fileSearch({ fileSearchStoreNames: [fileSearchStoreName] }) };
 
   const stream = createUIMessageStream<ChatMessage>({
     execute: async ({ writer }) => {
@@ -262,7 +221,6 @@ export async function POST(req: Request) {
       // ── GIVE_UP: reveal the check's answer, score -5, ask a new check ────
       if (intent === "give_up" && priorInteraction) {
         const interaction = priorInteraction;
-        const contextText = interaction.retrievedContext ?? "";
         const topicRows = await db.select().from(topics).where(eq(topics.id, interaction.topicId));
         const topic = topicRows[0];
         const newScore = clipScore(topic.masteryScore + scoreDelta("give_up"));
@@ -277,10 +235,10 @@ export async function POST(req: Request) {
           }),
         ]);
 
-        const prompt = REVEAL_TEMPLATE(interaction.response, contextText, topic.name, notebookTitle);
         const result = streamText({
           model: geminiModel,
-          messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...fileParts] }],
+          prompt: REVEAL_TEMPLATE(interaction.response, topic.name, notebookTitle),
+          tools: fsTools,
         });
         writer.merge(result.toUIMessageStream());
         const text = await result.text;
@@ -288,7 +246,7 @@ export async function POST(req: Request) {
         const [next, followups] = await Promise.all([
           createInteraction({
             userId, sessionId, notebookId, topicId: topic.id,
-            question: interaction.question, retrievedContext: contextText,
+            question: interaction.question, retrievedContext: "",
             promptTemplate: "reveal", response: text,
           }),
           generateFollowups(topic.name, newTier, text, true, newScore),
@@ -306,11 +264,10 @@ export async function POST(req: Request) {
       // ── ANSWER_ATTEMPT: score the check, then next answer + new check ────
       if (intent === "answer_attempt" && priorInteraction) {
         const interaction = priorInteraction;
-        const contextText = interaction.retrievedContext ?? "";
 
         const correctnessRaw = await generateText({
           model: geminiModel,
-          prompt: CLASSIFY_CHECK_TEMPLATE(interaction.response, contextText, userText),
+          prompt: CLASSIFY_CHECK_TEMPLATE(interaction.response, userText),
           providerOptions: NO_THINKING,
         });
         const correctness = parseCorrectness(correctnessRaw.text);
@@ -329,16 +286,17 @@ export async function POST(req: Request) {
         const isCorrect = correctness === "correct" || correctness === "correct_with_hint";
         const prompt = isCorrect
           ? AFTER_CORRECT_TEMPLATE(
-              interaction.question, userText, contextText, topic.name,
+              interaction.question, userText, topic.name,
               conversation, notebookTitle, newTier, newScore, correctness === "correct_with_hint",
             )
           : DIRECT_ANSWER_TEMPLATE(
-              interaction.question, contextText, topic.name, conversation, notebookTitle, newTier,
+              interaction.question, topic.name, conversation, notebookTitle, newTier,
             );
 
         const result = streamText({
           model: geminiModel,
-          messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...fileParts] }],
+          prompt,
+          tools: fsTools,
         });
         writer.merge(result.toUIMessageStream());
         const text = await result.text;
@@ -346,7 +304,7 @@ export async function POST(req: Request) {
         const [next, followups] = await Promise.all([
           createInteraction({
             userId, sessionId, notebookId, topicId: topic.id,
-            question: interaction.question, retrievedContext: contextText,
+            question: interaction.question, retrievedContext: "",
             promptTemplate: isCorrect ? "progress" : "answer", response: text,
           }),
           generateFollowups(topic.name, newTier, text, true, newScore),
@@ -363,32 +321,23 @@ export async function POST(req: Request) {
 
       // ── NEW_QUESTION (or give_up with no prior interaction) ─────────────
       const recentTopics = await listNotebookTopicNames(userId, notebookId);
-      const [topicGen, retrievedGen] = await Promise.all([
-        generateText({
-          model: geminiModel,
-          messages: [{ role: "user", content: [{ type: "text", text: CLASSIFY_TOPIC_TEMPLATE(userText, recentTopics) }, ...fileParts] }],
-          providerOptions: NO_THINKING,
-        }),
-        generateText({
-          model: geminiModel,
-          messages: [{ role: "user", content: [{ type: "text", text: RETRIEVE_PROMPT(userText) }, ...fileParts] }],
-          providerOptions: NO_THINKING,
-        }),
-      ]);
+
+      const topicGen = await generateText({
+        model: geminiModel,
+        prompt: CLASSIFY_TOPIC_TEMPLATE(userText, recentTopics),
+        providerOptions: NO_THINKING,
+      });
 
       let topicLabel = topicGen.text.toLowerCase().trim().replace(/\.$/, "");
       if (topicLabel.length > 100) topicLabel = topicLabel.slice(0, 100);
 
-      const { contextText, citations } = parseRetrieved(retrievedGen.text);
       const topic = await getOrCreateTopic(userId, notebookId, topicLabel);
       const tier = getMasteryTier(topic.masteryScore);
 
-      const prompt = DIRECT_ANSWER_TEMPLATE(
-        userText, contextText, topicLabel, conversation, notebookTitle, tier,
-      );
       const result = streamText({
         model: geminiModel,
-        messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...fileParts] }],
+        prompt: DIRECT_ANSWER_TEMPLATE(userText, topicLabel, conversation, notebookTitle, tier),
+        tools: fsTools,
       });
       writer.merge(result.toUIMessageStream());
       const text = await result.text;
@@ -396,7 +345,7 @@ export async function POST(req: Request) {
       const [interaction, followups] = await Promise.all([
         createInteraction({
           userId, sessionId, notebookId, topicId: topic.id,
-          question: userText, retrievedContext: contextText,
+          question: userText, retrievedContext: "",
           promptTemplate: "answer", response: text,
         }),
         generateFollowups(topicLabel, tier, text, true, topic.masteryScore),
@@ -405,7 +354,6 @@ export async function POST(req: Request) {
 
       writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
       writer.write({ type: "data-topic", id: "topic", data: { name: topicLabel, mastery_score: topic.masteryScore, tier } });
-      writer.write({ type: "data-citations", id: "citations", data: { items: citations } });
       writer.write({ type: "data-interaction", id: "interaction", data: { id: interaction.id } });
       writer.write({ type: "data-suggestions", id: "sugs", data: { items: followups } });
     },

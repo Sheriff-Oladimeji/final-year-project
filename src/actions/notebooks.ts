@@ -10,8 +10,10 @@ import {
   deleteNotebook,
   getNotebook,
 } from "@/db/queries/notebooks";
-import { listMaterialsByNotebook } from "@/db/queries/materials";
-import { deleteGeminiFile } from "@/lib/gemini/files";
+import {
+  createFileSearchStore,
+  deleteFileSearchStore,
+} from "@/lib/gemini/fileSearch";
 
 async function requireUser() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -29,7 +31,15 @@ export async function createNotebookAction(formData: FormData) {
   if (!title) return { error: "Notebook title is required." };
   if (title.length > 255) return { error: "Title is too long." };
 
-  const nb = await createNotebook({ userId: session.user.id, title });
+  // Create the File Search store first, then persist the notebook with its name.
+  let fileSearchStoreName: string | undefined;
+  try {
+    fileSearchStoreName = await createFileSearchStore(title);
+  } catch {
+    // Non-fatal — notebook still works, materials just can't be added until the store is created.
+  }
+
+  const nb = await createNotebook({ userId: session.user.id, title, fileSearchStoreName });
   revalidatePath("/dashboard");
   redirect(`/notebooks/${nb.id}`);
 }
@@ -54,10 +64,9 @@ export async function deleteNotebookAction(notebookId: string) {
   const nb = await getNotebook(notebookId, session.user.id);
   if (!nb) return { error: "Notebook not found." };
 
-  // Clean up Gemini files before the cascade delete.
-  const materials = await listMaterialsByNotebook(session.user.id, notebookId);
-  for (const m of materials) {
-    if (m.fileSearchId) await deleteGeminiFile(m.fileSearchId);
+  // Delete the File Search store (takes all documents with it) before DB cascade.
+  if (nb.fileSearchStoreName) {
+    await deleteFileSearchStore(nb.fileSearchStoreName);
   }
 
   await deleteNotebook(notebookId, session.user.id);

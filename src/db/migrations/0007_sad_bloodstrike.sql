@@ -1,0 +1,1 @@
+ALTER TABLE "notebooks" ADD COLUMN "file_search_store_name" text;
