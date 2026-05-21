@@ -45,42 +45,50 @@ export function buildFileParts(
   }));
 }
 
+// Gemini Files expire after 48h. Skip the API liveness check when indexedAt
+// is within 40h — saving one round-trip per material per chat request.
+const FORTY_HOURS_MS = 40 * 60 * 60 * 1000;
+
+function isRecentlyIndexed(material: Material): boolean {
+  return !!material.indexedAt && Date.now() - material.indexedAt.getTime() < FORTY_HOURS_MS;
+}
+
 export async function getActiveFiles(
   materials: Material[],
 ): Promise<Array<{ fileSearchId: string; kind: string }>> {
-  const live: Array<{ fileSearchId: string; kind: string }> = [];
+  const results = await Promise.all(
+    materials.map(async (material): Promise<{ fileSearchId: string; kind: string } | null> => {
+      if (!material.fileSearchId) return null;
 
-  for (const material of materials) {
-    if (!material.fileSearchId) continue;
+      let fileId = material.fileSearchId;
 
-    let fileId = material.fileSearchId;
-    const isActive = await checkFileActive(fileId);
-
-    if (!isActive) {
-      // PDFs have no local backup — re-upload from stored transcript for YouTube only
-      try {
-        if (material.kind === "youtube" && material.content) {
-          fileId = await uploadBytes(
-            Buffer.from(material.content, "utf-8"),
-            "text/plain",
-            material.displayName,
-          );
-          await setMaterialStatus(material.id, "ready", {
-            fileSearchId: fileId,
-            indexedAt: new Date(),
-          });
-        } else {
-          // PDF with expired Gemini file — mark failed so the student knows to re-add it
-          await setMaterialStatus(material.id, "failed");
-          continue;
+      if (!isRecentlyIndexed(material)) {
+        const active = await checkFileActive(fileId);
+        if (!active) {
+          try {
+            if (material.kind === "youtube" && material.content) {
+              fileId = await uploadBytes(
+                Buffer.from(material.content, "utf-8"),
+                "text/plain",
+                material.displayName,
+              );
+              await setMaterialStatus(material.id, "ready", {
+                fileSearchId: fileId,
+                indexedAt: new Date(),
+              });
+            } else {
+              await setMaterialStatus(material.id, "failed");
+              return null;
+            }
+          } catch {
+            return null;
+          }
         }
-      } catch {
-        continue;
       }
-    }
 
-    live.push({ fileSearchId: fileId, kind: material.kind });
-  }
+      return { fileSearchId: fileId, kind: material.kind };
+    }),
+  );
 
-  return live;
+  return results.filter((r): r is { fileSearchId: string; kind: string } => r !== null);
 }

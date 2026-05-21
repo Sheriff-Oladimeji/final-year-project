@@ -8,7 +8,7 @@ import {
   streamText,
 } from "ai";
 import { auth } from "@/lib/auth";
-import { geminiModel } from "@/lib/ai/model";
+import { geminiModel, NO_THINKING } from "@/lib/ai/model";
 import { buildFileContentParts } from "@/lib/ai/file-parts";
 import { buildConversationContext } from "@/lib/ai/conversation";
 import type { ChatMessage } from "@/lib/ai/chat-types";
@@ -87,6 +87,7 @@ async function classifyIntent(
     const { text } = await generateText({
       model: geminiModel,
       prompt: INTENT_CLASSIFIER_TEMPLATE(userText, lastGuidedQuestion),
+      providerOptions: NO_THINKING,
     });
     const label = text.trim().toLowerCase().split(/\s/)[0] ?? "";
     if (["new_question", "answer_attempt", "give_up", "meta"].includes(label)) {
@@ -162,6 +163,7 @@ async function generateFollowups(
       model: geminiModel,
       schema: SuggestionsSchema,
       prompt: FOLLOWUP_SUGGESTIONS_TEMPLATE(topic, tier, lastAssistant, endsWithCheck),
+      providerOptions: NO_THINKING,
     });
     if (object.suggestions.length > 0) return object.suggestions;
   } catch {
@@ -201,26 +203,32 @@ export async function POST(req: Request) {
     userId = session.user.id;
     sessionId = session.session.id;
 
-    const notebook = await getNotebook(notebookId, userId);
-    if (!notebook) return new Response("Notebook not found", { status: 404 });
-    notebookTitle = notebook.title;
+    // Run all independent DB queries in parallel
+    const [notebook, materials, priorInteractionRaw, recentInteractions] = await Promise.all([
+      getNotebook(notebookId, userId),
+      listReadyMaterialsInNotebook(userId, notebookId),
+      interactionId ? getInteraction(interactionId, userId) : Promise.resolve(null),
+      listInteractionsByNotebook(userId, notebookId, 12),
+    ]);
 
-    const materials = await listReadyMaterialsInNotebook(userId, notebookId);
+    if (!notebook) return new Response("Notebook not found", { status: 404 });
     if (materials.length === 0) {
       return new Response(
         "This notebook has no ready sources yet. Add at least one PDF or YouTube link first.",
         { status: 400 },
       );
     }
-    fileParts = await buildFileContentParts(materials);
 
-    priorInteraction = interactionId ? await getInteraction(interactionId, userId) : null;
+    notebookTitle = notebook.title;
+    priorInteraction = priorInteractionRaw;
+    conversation = buildConversationContext(recentInteractions, 6);
     const lastGuidedQuestion = priorInteraction?.response ?? null;
 
-    const recentInteractions = await listInteractionsByNotebook(userId, notebookId, 12);
-    conversation = buildConversationContext(recentInteractions, 6);
-
-    intent = await classifyIntent(userText, lastGuidedQuestion);
+    // File prep and intent classification are independent — run in parallel
+    [fileParts, intent] = await Promise.all([
+      buildFileContentParts(materials),
+      classifyIntent(userText, lastGuidedQuestion),
+    ]);
 
     if (
       intent === "answer_attempt" &&
@@ -301,6 +309,7 @@ export async function POST(req: Request) {
         const correctnessRaw = await generateText({
           model: geminiModel,
           prompt: CLASSIFY_CHECK_TEMPLATE(interaction.response, contextText, userText),
+          providerOptions: NO_THINKING,
         });
         const correctness = parseCorrectness(correctnessRaw.text);
         const delta = scoreDelta(correctness);
@@ -349,10 +358,12 @@ export async function POST(req: Request) {
         generateText({
           model: geminiModel,
           messages: [{ role: "user", content: [{ type: "text", text: CLASSIFY_TOPIC_TEMPLATE(userText, recentTopics) }, ...fileParts] }],
+          providerOptions: NO_THINKING,
         }),
         generateText({
           model: geminiModel,
           messages: [{ role: "user", content: [{ type: "text", text: RETRIEVE_PROMPT(userText) }, ...fileParts] }],
+          providerOptions: NO_THINKING,
         }),
       ]);
 
