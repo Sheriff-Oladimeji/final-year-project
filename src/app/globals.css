@@ -128,3 +128,27 @@
     @apply font-sans;
   }
 }
+
+@layer utilities {
+  /* Markdown content styling for AI responses */
+  .md h1 { @apply text-xl font-bold mt-5 mb-2; }
+  .md h2 { @apply text-lg font-bold mt-4 mb-1.5; }
+  .md h3 { @apply text-base font-semibold mt-3 mb-1; }
+  .md h4, .md h5, .md h6 { @apply font-semibold mt-2 mb-1; }
+  .md p  { @apply mb-3 leading-relaxed; }
+  .md p:last-child { @apply mb-0; }
+  .md ul { @apply list-disc pl-5 mb-3 space-y-1; }
+  .md ol { @apply list-decimal pl-5 mb-3 space-y-1; }
+  .md li > ul, .md li > ol { @apply mt-1 mb-0; }
+  .md strong { @apply font-semibold; }
+  .md em { @apply italic; }
+  .md code { @apply font-mono text-xs bg-muted px-1.5 py-0.5 rounded; }
+  .md pre { @apply bg-muted rounded-md p-3 overflow-x-auto my-2 text-xs; }
+  .md pre code { @apply bg-transparent p-0; }
+  .md table { @apply w-full border-collapse my-3 text-sm; }
+  .md th  { @apply border border-border bg-muted px-3 py-2 text-left font-semibold; }
+  .md td  { @apply border border-border px-3 py-2; }
+  .md blockquote { @apply border-l-2 border-primary/40 pl-3 text-muted-foreground my-2; }
+  .md hr { @apply border-border my-4; }
+  .md a  { @apply text-primary underline underline-offset-2; }
+}

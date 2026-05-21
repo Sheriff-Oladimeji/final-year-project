@@ -314,7 +314,7 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
     }
   }
 
-  const fullText = textChunks.join("").replace(/\[source:[^\]]*\]/gi, "").replace(/\s{2,}/g, " ").trim();
+  const fullText = textChunks.join("").replace(/\[source:[^\]]*\]/gi, "").trim();
 
   // Split "Quick check: …" from the body so we can render it as a callout
   const quickCheckMatch = fullText.match(/Quick check:\s*([\s\S]+)$/i);
