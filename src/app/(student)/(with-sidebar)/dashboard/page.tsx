@@ -8,7 +8,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { materials, topics } from "@/db/schema";
 import { listNotebooks } from "@/db/queries/notebooks";
-import { NotebookCard } from "@/components/notebooks/NotebookCard";
+import { NotebookGrid } from "@/components/notebooks/NotebookGrid";
 import { NewNotebookDialog } from "@/components/notebooks/NewNotebookDialog";
 import type { Notebook } from "@/types";
 
@@ -80,22 +80,14 @@ export default async function DashboardPage() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {notebooks.map((nb) => {
+        <NotebookGrid
+          entries={notebooks.map((nb) => {
             const sourceCount = sourceCountByNotebook.get(nb.id) ?? 0;
             const stats = topicStatsByNotebook.get(nb.id);
             const avg = stats && stats.count > 0 ? Math.round(stats.total / stats.count) : null;
-            return (
-              <NotebookCard
-                key={nb.id}
-                notebook={nb}
-                sourceCount={sourceCount}
-                topicCount={stats?.count ?? 0}
-                averageMastery={avg}
-              />
-            );
+            return { notebook: nb, sourceCount, topicCount: stats?.count ?? 0, averageMastery: avg };
           })}
-        </div>
+        />
       )}
     </div>
   );

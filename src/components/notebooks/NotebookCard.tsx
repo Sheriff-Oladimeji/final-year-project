@@ -29,6 +29,7 @@ interface NotebookCardProps {
   sourceCount: number;
   topicCount: number;
   averageMastery: number | null;
+  view?: "gallery" | "list";
 }
 
 export function NotebookCard({
@@ -36,6 +37,7 @@ export function NotebookCard({
   sourceCount,
   topicCount,
   averageMastery,
+  view = "gallery",
 }: NotebookCardProps) {
   const router = useRouter();
   const [renameOpen, setRenameOpen] = useState(false);
@@ -70,6 +72,137 @@ export function NotebookCard({
     router.refresh();
   }
 
+  const optionsMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            setRenameValue(notebook.title);
+            setRenameError(null);
+            setRenameOpen(true);
+          }}
+        >
+          <Pencil className="size-3.5 mr-2" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeleteOpen(true);
+          }}
+        >
+          <Trash2 className="size-3.5 mr-2" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const dialogs = (
+    <>
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename notebook</DialogTitle>
+            <DialogDescription>Enter a new name for this notebook.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleRename(); }}
+            maxLength={255}
+            autoFocus
+          />
+          {renameError && <p className="text-xs text-destructive">{renameError}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)}>Cancel</Button>
+            <Button onClick={handleRename} disabled={renaming || !renameValue.trim()}>
+              {renaming ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete notebook?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>{notebook.title}</strong> and all its sources and chat history. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+
+  if (view === "list") {
+    return (
+      <>
+        <div
+          className="flex items-center gap-4 px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer group bg-card"
+          onClick={() => router.push(`/notebooks/${notebook.id}`)}
+        >
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Book className="size-4" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+              {notebook.title}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Updated {timeAgo(notebook.updated_at)}
+            </p>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-4 shrink-0">
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <FileText className="size-3.5" />
+              {sourceCount} source{sourceCount === 1 ? "" : "s"}
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Brain className="size-3.5" />
+              {topicCount} topic{topicCount === 1 ? "" : "s"}
+            </span>
+            {averageMastery !== null ? (
+              <Badge
+                variant="outline"
+                className="bg-primary/10 text-primary border-primary/20 text-xs tabular-nums w-16 justify-center"
+              >
+                {averageMastery} / 100
+              </Badge>
+            ) : (
+              <span className="w-16" />
+            )}
+          </div>
+
+          {optionsMenu}
+        </div>
+        {dialogs}
+      </>
+    );
+  }
+
+  // Gallery view
   return (
     <>
       <Card
@@ -89,42 +222,7 @@ export function NotebookCard({
                 Updated {timeAgo(notebook.updated_at)}
               </p>
             </div>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity -mt-1 -mr-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreVertical className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setRenameValue(notebook.title);
-                    setRenameError(null);
-                    setRenameOpen(true);
-                  }}
-                >
-                  <Pencil className="size-3.5 mr-2" />
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteOpen(true);
-                  }}
-                >
-                  <Trash2 className="size-3.5 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="-mt-1 -mr-1">{optionsMenu}</div>
           </div>
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -151,48 +249,7 @@ export function NotebookCard({
           )}
         </CardContent>
       </Card>
-
-      {/* Rename dialog */}
-      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename notebook</DialogTitle>
-            <DialogDescription>Enter a new name for this notebook.</DialogDescription>
-          </DialogHeader>
-          <Input
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleRename(); }}
-            maxLength={255}
-            autoFocus
-          />
-          {renameError && <p className="text-xs text-destructive">{renameError}</p>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameOpen(false)}>Cancel</Button>
-            <Button onClick={handleRename} disabled={renaming || !renameValue.trim()}>
-              {renaming ? <Loader2 className="size-4 animate-spin" /> : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete confirmation dialog */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete notebook?</DialogTitle>
-            <DialogDescription>
-              This will permanently delete <strong>{notebook.title}</strong> and all its sources and chat history. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="size-4 animate-spin" /> : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {dialogs}
     </>
   );
 }
