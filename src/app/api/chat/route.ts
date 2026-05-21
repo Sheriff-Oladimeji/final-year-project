@@ -158,12 +158,13 @@ async function generateFollowups(
   tier: string,
   lastAssistant: string,
   endsWithCheck: boolean,
+  masteryScore?: number,
 ): Promise<string[]> {
   try {
     const { object } = await generateObject({
       model: geminiModel,
       schema: SuggestionsSchema,
-      prompt: FOLLOWUP_SUGGESTIONS_TEMPLATE(topic, tier, lastAssistant, endsWithCheck),
+      prompt: FOLLOWUP_SUGGESTIONS_TEMPLATE(topic, tier, lastAssistant, endsWithCheck, masteryScore),
       providerOptions: NO_THINKING,
     });
     if (object.suggestions.length > 0) return object.suggestions;
@@ -290,7 +291,7 @@ export async function POST(req: Request) {
             question: interaction.question, retrievedContext: contextText,
             promptTemplate: "reveal", response: text,
           }),
-          generateFollowups(topic.name, newTier, text, true),
+          generateFollowups(topic.name, newTier, text, true, newScore),
         ]);
         await touchNotebook(notebookId, userId);
 
@@ -329,7 +330,7 @@ export async function POST(req: Request) {
         const prompt = isCorrect
           ? AFTER_CORRECT_TEMPLATE(
               interaction.question, userText, contextText, topic.name,
-              conversation, notebookTitle, newTier, correctness === "correct_with_hint",
+              conversation, notebookTitle, newTier, newScore, correctness === "correct_with_hint",
             )
           : DIRECT_ANSWER_TEMPLATE(
               interaction.question, contextText, topic.name, conversation, notebookTitle, newTier,
@@ -348,7 +349,7 @@ export async function POST(req: Request) {
             question: interaction.question, retrievedContext: contextText,
             promptTemplate: isCorrect ? "progress" : "answer", response: text,
           }),
-          generateFollowups(topic.name, newTier, text, true),
+          generateFollowups(topic.name, newTier, text, true, newScore),
         ]);
         await touchNotebook(notebookId, userId);
 
@@ -398,7 +399,7 @@ export async function POST(req: Request) {
           question: userText, retrievedContext: contextText,
           promptTemplate: "answer", response: text,
         }),
-        generateFollowups(topicLabel, tier, text, true),
+        generateFollowups(topicLabel, tier, text, true, topic.masteryScore),
       ]);
       await touchNotebook(notebookId, userId);
 
