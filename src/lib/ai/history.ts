@@ -76,6 +76,22 @@ export function interactionsToUIMessages(
 
     assistantParts.push({ type: "text", text: it.response });
 
+    // Restore sources that were persisted as JSON in retrievedContext.
+    if (it.retrievedContext) {
+      try {
+        const items = JSON.parse(it.retrievedContext) as Array<{ name: string; excerpt?: string }>;
+        if (Array.isArray(items) && items.length > 0) {
+          assistantParts.push({
+            type: "data-sources",
+            id: `sources-${it.id}`,
+            data: { items },
+          });
+        }
+      } catch {
+        // Legacy rows with plain text or empty string — skip.
+      }
+    }
+
     messages.push({
       id: `a-${it.id}`,
       role: "assistant",

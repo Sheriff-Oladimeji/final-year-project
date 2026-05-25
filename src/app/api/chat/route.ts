@@ -96,29 +96,43 @@ async function classifyIntent(
   return lastGuidedQuestion ? "answer_attempt" : "new_question";
 }
 
-/** Pull grounding chunks from Google provider metadata and format as source items. */
-function extractSources(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  providerMeta: Record<string, unknown> | undefined,
+/**
+ * Explicitly retrieve 1–3 relevant passages from the file search store for a
+ * given question. Runs concurrently with the main answer stream so it adds no
+ * visible latency. Falls back to bare material names if anything fails.
+ */
+async function retrieveSourceExcerpts(
+  question: string,
+  fileSearchStoreName: string,
   fallbackNames: string[],
-): Array<{ name: string; excerpt?: string }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chunks: any[] | undefined = (providerMeta as any)?.google?.groundingMetadata?.groundingChunks;
-  if (!Array.isArray(chunks) || chunks.length === 0) {
-    return fallbackNames.map((name) => ({ name }));
+): Promise<Array<{ name: string; excerpt?: string }>> {
+  try {
+    const { text } = await generateText({
+      model: geminiModel,
+      providerOptions: NO_THINKING,
+      tools: { file_search: google.tools.fileSearch({ fileSearchStoreNames: [fileSearchStoreName] }) },
+      prompt: `\
+Find 1 to 3 short passages from the course materials most relevant to:
+"${question}"
+
+Output ONLY a JSON array — no other text:
+[{"name":"exact document title","excerpt":"verbatim passage, max 2 sentences"}]
+
+Quote the source text directly. If nothing relevant is found, output: []`,
+    });
+    const match = text.match(/\[[\s\S]*?\]/);
+    if (match) {
+      const parsed = JSON.parse(match[0]) as Array<{ name?: string; excerpt?: string }>;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+          .filter((item) => item.name)
+          .map(({ name, excerpt }) => ({ name: name!, excerpt: excerpt ?? undefined }));
+      }
+    }
+  } catch {
+    // fall through to fallback
   }
-  const seen = new Set<string>();
-  const items: Array<{ name: string; excerpt?: string }> = [];
-  for (const chunk of chunks) {
-    const rc = chunk?.retrievedContext;
-    if (!rc) continue;
-    const name: string = rc.title ?? "Source";
-    if (seen.has(name)) continue;
-    seen.add(name);
-    const excerpt: string | undefined = rc.text ?? undefined;
-    items.push({ name, excerpt });
-  }
-  return items.length > 0 ? items : fallbackNames.map((name) => ({ name }));
+  return fallbackNames.map((name) => ({ name }));
 }
 
 function parseCorrectness(raw: string): Correctness {
@@ -236,12 +250,15 @@ export async function POST(req: Request) {
           prompt: REVEAL_TEMPLATE(interaction.response, topic.name, notebookTitle),
           tools: fsTools,
         });
+        // Retrieval runs concurrently with the answer stream — no added latency.
+        const retrievalPromise = retrieveSourceExcerpts(interaction.question, fileSearchStoreName, materialNames);
         writer.merge(result.toUIMessageStream({ sendSources: true }));
-        const [text, providerMeta] = await Promise.all([result.text, result.providerMetadata]);
+        const [text, sourceItems] = await Promise.all([result.text, retrievalPromise]);
 
         const next = await createInteraction({
           userId, sessionId, notebookId, topicId: topic.id,
-          question: interaction.question, retrievedContext: "",
+          question: interaction.question,
+          retrievedContext: JSON.stringify(sourceItems),
           promptTemplate: "reveal", response: text,
         });
         await touchNotebook(notebookId, userId);
@@ -249,7 +266,7 @@ export async function POST(req: Request) {
         writer.write({ type: "data-mode", id: "mode", data: { value: "answer" } });
         writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
         writer.write({ type: "data-score", id: "score", data: { correctness: "give_up", score_delta: scoreDelta("give_up"), new_score: newScore, new_tier: newTier } });
-        writer.write({ type: "data-sources", id: "sources", data: { items: extractSources(providerMeta, materialNames) } });
+        writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
         return;
       }
@@ -291,12 +308,14 @@ export async function POST(req: Request) {
           prompt,
           tools: fsTools,
         });
+        const retrievalPromise = retrieveSourceExcerpts(interaction.question, fileSearchStoreName, materialNames);
         writer.merge(result.toUIMessageStream({ sendSources: true }));
-        const [text, providerMeta] = await Promise.all([result.text, result.providerMetadata]);
+        const [text, sourceItems] = await Promise.all([result.text, retrievalPromise]);
 
         const next = await createInteraction({
           userId, sessionId, notebookId, topicId: topic.id,
-          question: interaction.question, retrievedContext: "",
+          question: interaction.question,
+          retrievedContext: JSON.stringify(sourceItems),
           promptTemplate: isCorrect ? "progress" : "answer", response: text,
         });
         await touchNotebook(notebookId, userId);
@@ -304,7 +323,7 @@ export async function POST(req: Request) {
         writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
         writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
         writer.write({ type: "data-score", id: "score", data: { correctness, score_delta: delta, new_score: newScore, new_tier: newTier } });
-        writer.write({ type: "data-sources", id: "sources", data: { items: extractSources(providerMeta, materialNames) } });
+        writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
         return;
       }
@@ -329,19 +348,21 @@ export async function POST(req: Request) {
         prompt: DIRECT_ANSWER_TEMPLATE(userText, topicLabel, conversation, notebookTitle, tier),
         tools: fsTools,
       });
+      const retrievalPromise = retrieveSourceExcerpts(userText, fileSearchStoreName, materialNames);
       writer.merge(result.toUIMessageStream({ sendSources: true }));
-      const [text, providerMeta] = await Promise.all([result.text, result.providerMetadata]);
+      const [text, sourceItems] = await Promise.all([result.text, retrievalPromise]);
 
       const interaction = await createInteraction({
         userId, sessionId, notebookId, topicId: topic.id,
-        question: userText, retrievedContext: "",
+        question: userText,
+        retrievedContext: JSON.stringify(sourceItems),
         promptTemplate: "answer", response: text,
       });
       await touchNotebook(notebookId, userId);
 
       writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
       writer.write({ type: "data-topic", id: "topic", data: { name: topicLabel, mastery_score: topic.masteryScore, tier } });
-      writer.write({ type: "data-sources", id: "sources", data: { items: extractSources(providerMeta, materialNames) } });
+      writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
       writer.write({ type: "data-interaction", id: "interaction", data: { id: interaction.id } });
     },
     onError: (error) => {
