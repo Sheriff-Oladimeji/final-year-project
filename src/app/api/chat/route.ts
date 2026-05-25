@@ -96,6 +96,31 @@ async function classifyIntent(
   return lastGuidedQuestion ? "answer_attempt" : "new_question";
 }
 
+/** Pull grounding chunks from Google provider metadata and format as source items. */
+function extractSources(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  providerMeta: Record<string, unknown> | undefined,
+  fallbackNames: string[],
+): Array<{ name: string; excerpt?: string }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chunks: any[] | undefined = (providerMeta as any)?.google?.groundingMetadata?.groundingChunks;
+  if (!Array.isArray(chunks) || chunks.length === 0) {
+    return fallbackNames.map((name) => ({ name }));
+  }
+  const seen = new Set<string>();
+  const items: Array<{ name: string; excerpt?: string }> = [];
+  for (const chunk of chunks) {
+    const rc = chunk?.retrievedContext;
+    if (!rc) continue;
+    const name: string = rc.title ?? "Source";
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const excerpt: string | undefined = rc.text ?? undefined;
+    items.push({ name, excerpt });
+  }
+  return items.length > 0 ? items : fallbackNames.map((name) => ({ name }));
+}
+
 function parseCorrectness(raw: string): Correctness {
   const label = raw.trim().toLowerCase().split(/\s/)[0] ?? "incorrect";
   return (["correct", "correct_with_hint", "incorrect"].includes(label)
@@ -212,7 +237,7 @@ export async function POST(req: Request) {
           tools: fsTools,
         });
         writer.merge(result.toUIMessageStream({ sendSources: true }));
-        const text = await result.text;
+        const [text, providerMeta] = await Promise.all([result.text, result.providerMetadata]);
 
         const next = await createInteraction({
           userId, sessionId, notebookId, topicId: topic.id,
@@ -224,7 +249,7 @@ export async function POST(req: Request) {
         writer.write({ type: "data-mode", id: "mode", data: { value: "answer" } });
         writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
         writer.write({ type: "data-score", id: "score", data: { correctness: "give_up", score_delta: scoreDelta("give_up"), new_score: newScore, new_tier: newTier } });
-        writer.write({ type: "data-sources", id: "sources", data: { items: materialNames } });
+        writer.write({ type: "data-sources", id: "sources", data: { items: extractSources(providerMeta, materialNames) } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
         return;
       }
@@ -267,7 +292,7 @@ export async function POST(req: Request) {
           tools: fsTools,
         });
         writer.merge(result.toUIMessageStream({ sendSources: true }));
-        const text = await result.text;
+        const [text, providerMeta] = await Promise.all([result.text, result.providerMetadata]);
 
         const next = await createInteraction({
           userId, sessionId, notebookId, topicId: topic.id,
@@ -279,7 +304,7 @@ export async function POST(req: Request) {
         writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
         writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
         writer.write({ type: "data-score", id: "score", data: { correctness, score_delta: delta, new_score: newScore, new_tier: newTier } });
-        writer.write({ type: "data-sources", id: "sources", data: { items: materialNames } });
+        writer.write({ type: "data-sources", id: "sources", data: { items: extractSources(providerMeta, materialNames) } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
         return;
       }
@@ -305,7 +330,7 @@ export async function POST(req: Request) {
         tools: fsTools,
       });
       writer.merge(result.toUIMessageStream({ sendSources: true }));
-      const text = await result.text;
+      const [text, providerMeta] = await Promise.all([result.text, result.providerMetadata]);
 
       const interaction = await createInteraction({
         userId, sessionId, notebookId, topicId: topic.id,
@@ -316,7 +341,7 @@ export async function POST(req: Request) {
 
       writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
       writer.write({ type: "data-topic", id: "topic", data: { name: topicLabel, mastery_score: topic.masteryScore, tier } });
-      writer.write({ type: "data-sources", id: "sources", data: { items: materialNames } });
+      writer.write({ type: "data-sources", id: "sources", data: { items: extractSources(providerMeta, materialNames) } });
       writer.write({ type: "data-interaction", id: "interaction", data: { id: interaction.id } });
     },
     onError: (error) => {

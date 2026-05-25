@@ -5,8 +5,8 @@ import type { Correctness, Tier } from "@/types";
 // turn alongside the streamed answer text.
 export type ChatDataParts = {
   topic: { name: string; mastery_score: number; tier: Tier };
-  // Names of the notebook materials that were searched to ground this answer.
-  sources: { items: string[] };
+  // Sources used to ground this answer, with optional retrieved passage excerpt.
+  sources: { items: Array<{ name: string; excerpt?: string }> };
   score: {
     correctness: Correctness | "give_up";
     score_delta: number;

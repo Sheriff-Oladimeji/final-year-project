@@ -262,7 +262,7 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
   let topic: string | null = null;
   let score: { correctness: Correctness | "give_up"; score_delta: number; new_score: number } | null = null;
   const textChunks: string[] = [];
-  let sourceTitles: string[] = [];
+  let sources: Array<{ name: string; excerpt?: string }> = [];
 
   for (const part of message.parts) {
     if (part.type === "text") {
@@ -272,7 +272,7 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
     } else if (part.type === "data-score") {
       score = part.data;
     } else if (part.type === "data-sources") {
-      sourceTitles = part.data.items;
+      sources = part.data.items;
     }
   }
 
@@ -331,19 +331,26 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
           </div>
         )}
 
-        {sourceTitles.length > 0 && (
+        {sources.length > 0 && (
           <Sources>
-            <SourcesTrigger count={sourceTitles.length}>
+            <SourcesTrigger count={sources.length}>
               <BookOpen className="size-3" />
               <span className="font-medium">
-                {sourceTitles.length} source{sourceTitles.length > 1 ? "s" : ""}
+                {sources.length} source{sources.length > 1 ? "s" : ""}
               </span>
             </SourcesTrigger>
             <SourcesContent className="space-y-1.5">
-              {sourceTitles.map((title, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs">
-                  <FileText className="size-3 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-foreground font-medium">{title}</span>
+              {sources.map((src, i) => (
+                <div key={i} className="flex flex-col gap-1 rounded-lg bg-muted/50 px-3 py-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <FileText className="size-3 shrink-0 text-muted-foreground" />
+                    <span className="truncate text-foreground font-medium">{src.name}</span>
+                  </div>
+                  {src.excerpt && (
+                    <p className="pl-5 text-muted-foreground leading-snug line-clamp-3">
+                      {src.excerpt}
+                    </p>
+                  )}
                 </div>
               ))}
             </SourcesContent>
