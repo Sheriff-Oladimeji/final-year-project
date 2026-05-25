@@ -3,7 +3,7 @@
 import { useState, Fragment, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Sparkles, BookOpen, AlertCircle, Loader2, FileText } from "lucide-react";
+import { Sparkles, BookOpen, AlertCircle, FileText } from "lucide-react";
 import {
   Conversation,
   ConversationContent,
@@ -183,12 +183,7 @@ export function ChatThread({
 
           {status === "submitted" && (
             <Message from="assistant">
-              <MessageContent className="border-l-2 border-primary/40 pl-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin text-primary" />
-                  <ThinkingDots />
-                </div>
-              </MessageContent>
+              <TypingBubble />
             </Message>
           )}
         </ConversationContent>
@@ -245,16 +240,13 @@ export function ChatThread({
   );
 }
 
-function ThinkingDots() {
+function TypingBubble() {
   return (
-    <span className="inline-flex items-center gap-1">
-      <span>Thinking</span>
-      <span className="inline-flex gap-0.5">
-        <span className="size-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
-        <span className="size-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
-        <span className="size-1 rounded-full bg-current animate-bounce" />
-      </span>
-    </span>
+    <div className="flex items-center gap-1.5 px-4 py-3.5 rounded-2xl rounded-tl-sm bg-muted w-fit">
+      <span className="size-2 rounded-full bg-foreground/50 [animation:typing-dot_1.2s_ease-in-out_infinite] [animation-delay:0s]" />
+      <span className="size-2 rounded-full bg-foreground/50 [animation:typing-dot_1.2s_ease-in-out_infinite] [animation-delay:0.2s]" />
+      <span className="size-2 rounded-full bg-foreground/50 [animation:typing-dot_1.2s_ease-in-out_infinite] [animation-delay:0.4s]" />
+    </div>
   );
 }
 
