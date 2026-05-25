@@ -262,7 +262,7 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
   let topic: string | null = null;
   let score: { correctness: Correctness | "give_up"; score_delta: number; new_score: number } | null = null;
   const textChunks: string[] = [];
-  const sourceTitles: string[] = [];
+  let sourceTitles: string[] = [];
 
   for (const part of message.parts) {
     if (part.type === "text") {
@@ -271,11 +271,8 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
       topic = part.data.name;
     } else if (part.type === "data-score") {
       score = part.data;
-    } else if (part.type === "source-document") {
-      // Deduplicate by title
-      if (!sourceTitles.includes(part.title)) {
-        sourceTitles.push(part.title);
-      }
+    } else if (part.type === "data-sources") {
+      sourceTitles = part.data.items;
     }
   }
 
