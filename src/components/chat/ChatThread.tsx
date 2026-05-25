@@ -3,7 +3,7 @@
 import { useState, Fragment, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Sparkles, BookOpen, AlertCircle, Loader2 } from "lucide-react";
+import { Sparkles, BookOpen, AlertCircle, Loader2, FileText } from "lucide-react";
 import {
   Conversation,
   ConversationContent,
@@ -23,7 +23,6 @@ import {
   PromptInputFooter,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
-import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion";
 import {
   Sources,
   SourcesContent,
@@ -82,23 +81,6 @@ export function ChatThread({
   const readyCount = materials.filter((m) => m.status === "ready").length;
   const noReadySources = readyCount === 0;
 
-  // Aggregate starter suggestions from all ready materials.
-  const starterSuggestions = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const m of materials) {
-      if (m.status !== "ready") continue;
-      for (const s of m.suggestions) {
-        if (!seen.has(s)) {
-          seen.add(s);
-          out.push(s);
-        }
-      }
-      if (out.length >= 4) break;
-    }
-    return out.slice(0, 4);
-  }, [materials]);
-
   const { messages, sendMessage, status, error } = useChat<ChatMessage>({
     messages: initialMessages,
     transport: new DefaultChatTransport({ api: "/api/chat" }),
@@ -114,12 +96,11 @@ export function ChatThread({
     },
   });
 
-  const { topicName, masteryScore, tier, recentCorrectness, latestSuggestions } = useMemo(() => {
+  const { topicName, masteryScore, tier, recentCorrectness } = useMemo(() => {
     let topicName: string | null = null;
     let masteryScore: number | null = null;
     let tier: Tier | null = null;
     const recent: (Correctness | "give_up")[] = [];
-    let latestSuggestions: string[] = [];
 
     for (const m of messages) {
       if (m.role !== "assistant") continue;
@@ -132,13 +113,11 @@ export function ChatThread({
           masteryScore = part.data.new_score;
           tier = part.data.new_tier;
           recent.push(part.data.correctness);
-        } else if (part.type === "data-suggestions") {
-          latestSuggestions = part.data.items;
         }
       }
     }
     const recentCorrectness = recent.filter((c): c is Correctness => c !== "give_up");
-    return { topicName, masteryScore, tier, recentCorrectness, latestSuggestions };
+    return { topicName, masteryScore, tier, recentCorrectness };
   }, [messages]);
 
   function send(userText: string) {
@@ -161,13 +140,6 @@ export function ChatThread({
       : status === "error"
         ? "error"
         : "ready";
-
-  const visibleSuggestions =
-    messages.length === 0
-      ? starterSuggestions
-      : status === "ready"
-        ? latestSuggestions
-        : [];
 
   return (
     <div className="flex flex-1 min-w-0 gap-6">
@@ -232,16 +204,6 @@ export function ChatThread({
         </Alert>
       )}
 
-      {visibleSuggestions.length > 0 && !noReadySources && (
-        <div className="mb-3">
-          <Suggestions>
-            {visibleSuggestions.map((s) => (
-              <Suggestion key={s} suggestion={s} onClick={(v) => send(v)} />
-            ))}
-          </Suggestions>
-        </div>
-      )}
-
       <PromptInput onSubmit={handleSubmit}>
         <PromptInputBody>
           <PromptInputTextarea
@@ -298,19 +260,22 @@ function ThinkingDots() {
 
 function AssistantTurn({ message }: { message: ChatMessage }) {
   let topic: string | null = null;
-  let citations: { source: string; excerpt: string }[] = [];
   let score: { correctness: Correctness | "give_up"; score_delta: number; new_score: number } | null = null;
   const textChunks: string[] = [];
+  const sourceTitles: string[] = [];
 
   for (const part of message.parts) {
     if (part.type === "text") {
       textChunks.push(part.text);
     } else if (part.type === "data-topic") {
       topic = part.data.name;
-    } else if (part.type === "data-citations") {
-      citations = part.data.items;
     } else if (part.type === "data-score") {
       score = part.data;
+    } else if (part.type === "source-document") {
+      // Deduplicate by title
+      if (!sourceTitles.includes(part.title)) {
+        sourceTitles.push(part.title);
+      }
     }
   }
 
@@ -369,19 +334,19 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
           </div>
         )}
 
-        {citations.length > 0 && (
+        {sourceTitles.length > 0 && (
           <Sources>
-            <SourcesTrigger count={citations.length}>
+            <SourcesTrigger count={sourceTitles.length}>
               <BookOpen className="size-3" />
               <span className="font-medium">
-                {citations.length} source{citations.length > 1 ? "s" : ""}
+                {sourceTitles.length} source{sourceTitles.length > 1 ? "s" : ""}
               </span>
             </SourcesTrigger>
-            <SourcesContent className="space-y-2">
-              {citations.map((c, i) => (
-                <div key={i} className="rounded-lg bg-muted/50 p-3 text-xs">
-                  <p className="font-medium text-muted-foreground mb-1">{c.source}</p>
-                  <p className="text-foreground leading-relaxed">{c.excerpt}</p>
+            <SourcesContent className="space-y-1.5">
+              {sourceTitles.map((title, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs">
+                  <FileText className="size-3 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-foreground font-medium">{title}</span>
                 </div>
               ))}
             </SourcesContent>
