@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { disableUser, deleteUser } from "@/db/queries/users";
+import { disableUser, enableUser, deleteUser } from "@/db/queries/users";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -18,6 +18,15 @@ export async function disableUserAction(userId: string) {
   if (authError) return authError;
 
   await disableUser(userId);
+  revalidatePath("/admin/users");
+  return { data: { success: true } };
+}
+
+export async function enableUserAction(userId: string) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
+  await enableUser(userId);
   revalidatePath("/admin/users");
   return { data: { success: true } };
 }

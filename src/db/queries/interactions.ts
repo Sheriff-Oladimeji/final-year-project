@@ -1,7 +1,9 @@
 import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { interactions } from "@/db/schema";
+import { interactions, user } from "@/db/schema";
 import type { Interaction } from "@/db/schema";
+
+export type InteractionWithEmail = Interaction & { userEmail: string };
 
 export async function createInteraction(data: {
   userId: string;
@@ -72,20 +74,21 @@ export async function listInteractionsAdmin(params: {
   toDate?: Date;
   skip?: number;
   limit?: number;
-}): Promise<Interaction[]> {
+}): Promise<InteractionWithEmail[]> {
   const conditions = [];
   if (params.userId)   conditions.push(eq(interactions.userId, params.userId));
   if (params.topicId)  conditions.push(eq(interactions.topicId, params.topicId));
   if (params.fromDate) conditions.push(gte(interactions.createdAt, params.fromDate));
   if (params.toDate)   conditions.push(lte(interactions.createdAt, params.toDate));
 
-  const query = db
-    .select()
+  const rows = await db
+    .select({ interaction: interactions, userEmail: user.email })
     .from(interactions)
+    .innerJoin(user, eq(interactions.userId, user.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(interactions.createdAt))
-    .limit(params.limit ?? 100)
+    .limit(params.limit ?? 200)
     .offset(params.skip ?? 0);
 
-  if (conditions.length > 0) return query.where(and(...conditions));
-  return query;
+  return rows.map(({ interaction, userEmail }) => ({ ...interaction, userEmail }));
 }

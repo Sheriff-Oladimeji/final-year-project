@@ -46,6 +46,7 @@ export default async function AdminInteractionsPage({ searchParams }: PageProps)
     })
     .map((i) => ({
       id: i.id,
+      user_email: i.userEmail,
       question: i.question,
       student_reply: i.studentReply,
       correctness: i.correctness,
@@ -76,6 +77,7 @@ export default async function AdminInteractionsPage({ searchParams }: PageProps)
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Student</TableHead>
                 <TableHead>Question</TableHead>
                 <TableHead>Student reply</TableHead>
                 <TableHead>Correctness</TableHead>
@@ -87,6 +89,9 @@ export default async function AdminInteractionsPage({ searchParams }: PageProps)
             <TableBody>
               {interactions.map((i) => (
                 <TableRow key={i.id}>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap max-w-[160px]">
+                    <p className="truncate" title={i.user_email}>{i.user_email}</p>
+                  </TableCell>
                   <TableCell className="max-w-xs text-sm">
                     <p className="truncate" title={i.question}>{i.question}</p>
                   </TableCell>

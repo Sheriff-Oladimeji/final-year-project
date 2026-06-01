@@ -22,6 +22,15 @@ export async function disableUser(id: string): Promise<User> {
   return rows[0];
 }
 
+export async function enableUser(id: string): Promise<User> {
+  const rows = await db
+    .update(user)
+    .set({ disabledAt: null })
+    .where(eq(user.id, id))
+    .returning();
+  return rows[0];
+}
+
 export async function deleteUser(id: string): Promise<void> {
   await db.delete(user).where(eq(user.id, id));
 }

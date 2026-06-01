@@ -63,9 +63,9 @@ export function InteractionFilters() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
-            <SelectItem value="recall">Recall</SelectItem>
-            <SelectItem value="application">Application</SelectItem>
-            <SelectItem value="analysis">Analysis</SelectItem>
+            <SelectItem value="answer">Answer</SelectItem>
+            <SelectItem value="progress">Progress</SelectItem>
+            <SelectItem value="reveal">Reveal</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Ban, Trash2 } from "lucide-react";
+import { Loader2, Ban, CheckCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { disableUserAction, deleteUserAction } from "@/actions/admin";
+import { disableUserAction, enableUserAction, deleteUserAction } from "@/actions/admin";
 import type { UserAdmin } from "@/types";
 
 interface UserActionsProps {
@@ -22,17 +22,21 @@ interface UserActionsProps {
 
 export function UserActions({ user }: UserActionsProps) {
   const router = useRouter();
-  const [disabling, setDisabling] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  async function handleDisable() {
-    setDisabling(true);
+  async function handleToggle() {
+    setBusy(true);
     try {
-      await disableUserAction(user.id);
+      if (isDisabled) {
+        await enableUserAction(user.id);
+      } else {
+        await disableUserAction(user.id);
+      }
       router.refresh();
     } finally {
-      setDisabling(false);
+      setBusy(false);
     }
   }
 
@@ -40,8 +44,8 @@ export function UserActions({ user }: UserActionsProps) {
     setDeleting(true);
     try {
       await deleteUserAction(user.id);
-      router.refresh();
       setDeleteOpen(false);
+      router.refresh();
     } finally {
       setDeleting(false);
     }
@@ -54,16 +58,19 @@ export function UserActions({ user }: UserActionsProps) {
       <Button
         variant="outline"
         size="xs"
-        disabled={isDisabled || disabling}
-        onClick={handleDisable}
-        title={isDisabled ? "Already disabled" : "Disable account"}
+        disabled={busy}
+        onClick={handleToggle}
+        title={isDisabled ? "Re-enable account" : "Disable account"}
+        className={isDisabled ? "text-green-700 border-green-200 hover:bg-green-50" : ""}
       >
-        {disabling ? (
+        {busy ? (
           <Loader2 className="size-3 animate-spin" />
+        ) : isDisabled ? (
+          <CheckCircle className="size-3" />
         ) : (
           <Ban className="size-3" />
         )}
-        {isDisabled ? "Disabled" : "Disable"}
+        {isDisabled ? "Re-enable" : "Disable"}
       </Button>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
