@@ -315,9 +315,11 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
         </MessageContent>
 
         {quickCheckQuestion && (
-          <div className="border-t border-border/60 pt-3 mt-1">
-            <p className="text-sm text-foreground leading-snug">
-              <span className="text-muted-foreground">Quick check — </span>
+          <div className="mt-4 pt-3 border-t border-border space-y-2">
+            <span className="inline-flex items-center rounded-full bg-primary px-3 py-0.5 text-[11px] font-semibold tracking-wide text-primary-foreground">
+              Quick check
+            </span>
+            <p className="text-[15px] font-bold text-foreground leading-snug">
               {quickCheckQuestion}
             </p>
           </div>
