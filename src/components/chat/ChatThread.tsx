@@ -279,6 +279,16 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
 
   const correctnessStyle = score ? CORRECTNESS_STYLES[score.correctness] : null;
 
+  // During the file-search tool phase, the stream is active but no text has
+  // arrived yet. Show the typing bubble instead of a blank card.
+  if (!fullText && !topic && !score) {
+    return (
+      <Message from="assistant">
+        <TypingBubble />
+      </Message>
+    );
+  }
+
   return (
     <Message from="assistant">
       <div className="flex flex-col gap-2">
