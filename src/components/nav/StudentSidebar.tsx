@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, BrainCircuit, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, LogOut, BrainCircuit, ShieldCheck, Menu, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const links = [
   { href: "/dashboard", label: "Notebooks", icon: LayoutDashboard },
@@ -21,6 +21,12 @@ export function StudentSidebar({ isAdmin, userEmail }: StudentSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -32,13 +38,53 @@ export function StudentSidebar({ isAdmin, userEmail }: StudentSidebarProps) {
   const initial = userEmail.charAt(0).toUpperCase();
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-border bg-card sticky top-0">
+    <>
+      {/* Mobile top bar with hamburger */}
+      <div className="lg:hidden sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-4">
+        <button
+          onClick={() => setOpen(true)}
+          className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label="Open menu"
+        >
+          <Menu className="size-5" />
+        </button>
+        <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
+          <BrainCircuit className="size-4 text-primary-foreground" />
+        </div>
+        <span className="font-bold text-sm tracking-tight">LearnAI</span>
+      </div>
+
+      {/* Backdrop (mobile only, when drawer open) */}
+      {open && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "flex h-screen w-64 flex-col border-r border-border bg-card",
+          // Mobile: fixed slide-in drawer
+          "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:w-72 max-lg:max-w-[85vw] max-lg:shadow-2xl max-lg:transition-transform max-lg:duration-200",
+          open ? "max-lg:translate-x-0" : "max-lg:-translate-x-full",
+          // Desktop: static sticky column
+          "lg:sticky lg:top-0 lg:w-56 lg:shrink-0 lg:translate-x-0",
+        )}
+      >
       {/* Brand */}
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
         <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
           <BrainCircuit className="size-4 text-primary-foreground" />
         </div>
         <span className="font-bold text-sm tracking-tight">LearnAI</span>
+        <button
+          onClick={() => setOpen(false)}
+          className="lg:hidden ml-auto flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label="Close menu"
+        >
+          <X className="size-4" />
+        </button>
       </div>
 
       {/* Nav (scrollable when content overflows) */}
@@ -97,6 +143,7 @@ export function StudentSidebar({ isAdmin, userEmail }: StudentSidebarProps) {
           Sign out
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

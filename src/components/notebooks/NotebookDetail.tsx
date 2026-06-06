@@ -45,7 +45,7 @@ export function NotebookDetail({
   const [mobileMastery, setMobileMastery] = useState(false);
 
   return (
-    <div className="flex flex-col h-screen px-4 py-3 lg:px-6 lg:py-4">
+    <div className="flex flex-col h-[100dvh] px-4 py-3 lg:px-6 lg:py-4">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-2 mb-3 lg:mb-4">
         <div className="flex items-center gap-1.5 min-w-0">
