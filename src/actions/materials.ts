@@ -14,6 +14,7 @@ import {
   MATERIALS_PER_NOTEBOOK_CAP,
 } from "@/db/queries/materials";
 import { getNotebook, touchNotebook } from "@/db/queries/notebooks";
+import { del } from "@vercel/blob";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadDocumentToStore, deleteDocumentFromStore } from "@/lib/gemini/fileSearch";
 import { generateMaterialSuggestions } from "@/lib/ai/suggestions";
@@ -48,18 +49,29 @@ async function persistSuggestions(materialId: string, userId: string) {
   }
 }
 
-export async function uploadPdfAction(formData: FormData) {
+/**
+ * Indexes a PDF that the browser already uploaded to Vercel Blob. The client
+ * uploads the file straight to Blob (bypassing the 4.5 MB Vercel function body
+ * limit), then calls this with just the blob URL and file name (a tiny payload).
+ * We download the bytes server-side, index them into Gemini File Search, then
+ * delete the blob so it is only used as transit storage.
+ */
+export async function indexPdfFromBlobAction(input: {
+  notebookId: string;
+  blobUrl: string;
+  fileName: string;
+}) {
   const session = await requireUser();
   if ("error" in session) return session;
 
-  const notebookId = formData.get("notebookId") as string | null;
+  const { notebookId, blobUrl, fileName } = input;
   if (!notebookId) return { error: "Missing notebook." };
+  if (!blobUrl) return { error: "Missing uploaded file." };
   const capCheck = await checkCanAddMaterial(session.user.id, notebookId);
-  if (capCheck) return capCheck;
-
-  const file = formData.get("file") as File | null;
-  if (!file || file.type !== "application/pdf") {
-    return { error: "Please upload a valid PDF file." };
+  if (capCheck) {
+    // Clean up the orphaned blob since we won't index it.
+    await del(blobUrl).catch(() => {});
+    return capCheck;
   }
 
   const nb = await getNotebook(notebookId, session.user.id);
@@ -69,25 +81,31 @@ export async function uploadPdfAction(formData: FormData) {
     userId: session.user.id,
     notebookId,
     kind: "pdf",
-    displayName: file.name,
-    sourceUri: file.name,
+    displayName: fileName,
+    sourceUri: fileName,
   });
 
   revalidatePath(`/notebooks/${notebookId}`);
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   const materialId = material.id;
   const userId = session.user.id;
 
   after(async () => {
     try {
-      const documentName = await uploadDocumentToStore(storeName, buffer, "application/pdf", file.name);
+      const res = await fetch(blobUrl);
+      if (!res.ok) throw new Error(`Blob fetch failed: ${res.status}`);
+      const buffer = Buffer.from(await res.arrayBuffer());
+
+      const documentName = await uploadDocumentToStore(storeName, buffer, "application/pdf", fileName);
       await setMaterialStatus(materialId, "ready", { fileSearchId: documentName, indexedAt: new Date() });
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
     } catch (err) {
-      console.error("[uploadPdfAction] after() failed:", err);
+      console.error("[indexPdfFromBlobAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");
+    } finally {
+      // Blob was only transit storage; remove it whether indexing succeeded or not.
+      await del(blobUrl).catch(() => {});
     }
   });
 
@@ -106,12 +124,10 @@ export async function submitYoutubeAction(formData: FormData) {
   const url = (formData.get("url") as string | null)?.trim();
   if (!url) return { error: "Please provide a YouTube URL." };
 
-  let videoId: string;
   let title: string;
   let transcriptText: string;
   try {
     const result = await fetchTranscript(url);
-    videoId = result.videoId;
     title = result.title;
     transcriptText = result.text;
   } catch (err: unknown) {
