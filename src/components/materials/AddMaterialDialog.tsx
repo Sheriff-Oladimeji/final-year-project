@@ -15,10 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { upload } from "@vercel/blob/client";
-import { indexPdfFromBlobAction, submitYoutubeAction } from "@/actions/materials";
-
-const MAX_PDF_BYTES = 25 * 1024 * 1024; // 25 MB
+import { uploadPdfAction, submitYoutubeAction } from "@/actions/materials";
 
 interface AddMaterialDialogProps {
   notebookId: string;
@@ -61,34 +58,12 @@ export function AddMaterialDialog({
     const file = e.target.files?.[0];
     if (!file) return;
     setPdfError(null);
-
-    if (file.type !== "application/pdf") {
-      setPdfError("Please choose a valid PDF file.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-    if (file.size > MAX_PDF_BYTES) {
-      setPdfError("That PDF is larger than 25 MB. Please choose a smaller file.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
     setUploadingPdf(true);
     try {
-      // Browser uploads straight to Vercel Blob (no 4.5 MB function limit).
-      const blob = await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/blob-upload",
-        contentType: "application/pdf",
-      });
-
-      // Hand the blob URL to the server to index into Gemini and clean up.
-      const result = await indexPdfFromBlobAction({
-        notebookId,
-        blobUrl: blob.url,
-        fileName: file.name,
-      });
-
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("notebookId", notebookId);
+      const result = await uploadPdfAction(formData);
       if ("error" in result) {
         setPdfError(result.error ?? "Upload failed.");
       } else {
@@ -97,8 +72,8 @@ export function AddMaterialDialog({
         reset();
         router.refresh();
       }
-    } catch (err) {
-      setPdfError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+    } catch {
+      setPdfError("Upload failed. Please try again.");
     } finally {
       setUploadingPdf(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
