@@ -35,6 +35,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json(jsonResponse);
   } catch (error) {
+    console.error("[/api/blob-upload] failed:", error);
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error("[/api/blob-upload] BLOB_READ_WRITE_TOKEN is not set in this environment.");
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Upload failed." },
       { status: 400 },
