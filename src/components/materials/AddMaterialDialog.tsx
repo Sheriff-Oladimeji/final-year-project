@@ -17,6 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { uploadPdfAction, submitYoutubeAction } from "@/actions/materials";
 
+// Vercel caps function request bodies at ~4.5 MB on every plan. We keep a 4 MB
+// ceiling to stay safely under it and give a clear message before uploading.
+const MAX_PDF_BYTES = 4 * 1024 * 1024;
+
 interface AddMaterialDialogProps {
   notebookId: string;
   trigger?: React.ReactNode;
@@ -58,6 +62,13 @@ export function AddMaterialDialog({
     const file = e.target.files?.[0];
     if (!file) return;
     setPdfError(null);
+
+    if (file.size > MAX_PDF_BYTES) {
+      setPdfError("That PDF is larger than 4 MB. Please choose a smaller file.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setUploadingPdf(true);
     try {
       const formData = new FormData();
@@ -141,7 +152,7 @@ export function AddMaterialDialog({
 
           <TabsContent value="pdf" className="space-y-3 mt-4">
             <p className="text-xs text-muted-foreground">
-              Max 25 MB. Must be a valid PDF file.
+              Max 4 MB. Must be a valid PDF file.
             </p>
             {pdfError && (
               <Alert variant="destructive">
