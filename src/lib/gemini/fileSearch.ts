@@ -22,11 +22,16 @@ export async function uploadDocumentToStore(
   ) as ArrayBuffer;
   const blob = new Blob([buf], { type: mimeType });
 
+  // Don't pass `mimeType` in `config` here — the Files API's request-body
+  // validation for that field rejects some otherwise-valid vendor MIME
+  // strings (e.g. the docx type) with a spurious 400. Setting it only on
+  // the Blob still gets the correct type through via the upload header,
+  // and the API accepts it there.
   let op: UploadToFileSearchStoreOperation =
     await client.fileSearchStores.uploadToFileSearchStore({
       fileSearchStoreName: storeName,
       file: blob,
-      config: { mimeType, displayName },
+      config: { displayName },
     });
 
   const deadline = Date.now() + 90_000;
