@@ -2,13 +2,14 @@ import { eq, and, desc, count } from "drizzle-orm";
 import { db } from "@/db";
 import { materials } from "@/db/schema";
 import type { Material } from "@/db/schema";
+import type { MaterialKind } from "@/lib/materials";
 
 export const MATERIALS_PER_NOTEBOOK_CAP = 5;
 
 export async function createMaterial(data: {
   userId: string;
   notebookId: string;
-  kind: "pdf" | "youtube";
+  kind: MaterialKind;
   displayName: string;
   sourceUri: string;
   localPath?: string;

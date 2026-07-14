@@ -15,11 +15,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { uploadPdfAction, submitYoutubeAction } from "@/actions/materials";
+import { uploadMaterialAction, submitYoutubeAction } from "@/actions/materials";
+import { MATERIAL_UPLOAD_ACCEPT } from "@/lib/materials";
 
 // Vercel caps function request bodies at ~4.5 MB on every plan. We keep a 4 MB
 // ceiling to stay safely under it and give a clear message before uploading.
-const MAX_PDF_BYTES = 4 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 interface AddMaterialDialogProps {
   notebookId: string;
@@ -36,15 +37,15 @@ export function AddMaterialDialog({
 }: AddMaterialDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [uploadingPdf, setUploadingPdf] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [submittingVideo, setSubmittingVideo] = useState(false);
   const [youtubeError, setYoutubeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function reset() {
-    setPdfError(null);
+    setFileError(null);
     setYoutubeError(null);
     setYoutubeUrl("");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -52,31 +53,31 @@ export function AddMaterialDialog({
 
   function handleOpenChange(next: boolean) {
     if (disabled) return;
-    if (!uploadingPdf && !submittingVideo) {
+    if (!uploadingFile && !submittingVideo) {
       setOpen(next);
       if (!next) reset();
     }
   }
 
-  async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPdfError(null);
+    setFileError(null);
 
-    if (file.size > MAX_PDF_BYTES) {
-      setPdfError("That PDF is larger than 4 MB. Please choose a smaller file.");
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setFileError("That file is larger than 4 MB. Please choose a smaller file.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
-    setUploadingPdf(true);
+    setUploadingFile(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("notebookId", notebookId);
-      const result = await uploadPdfAction(formData);
+      const result = await uploadMaterialAction(formData);
       if ("error" in result) {
-        setPdfError(result.error ?? "Upload failed.");
+        setFileError(result.error ?? "Upload failed.");
       } else {
         // Close immediately — sidebar will show Indexing while Gemini processes
         setOpen(false);
@@ -84,9 +85,9 @@ export function AddMaterialDialog({
         router.refresh();
       }
     } catch {
-      setPdfError("Upload failed. Please try again.");
+      setFileError("Upload failed. Please try again.");
     } finally {
-      setUploadingPdf(false);
+      setUploadingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -134,15 +135,15 @@ export function AddMaterialDialog({
         <DialogHeader>
           <DialogTitle>Add new source</DialogTitle>
           <DialogDescription>
-            Upload a PDF or add a YouTube video. Gemini will index it for your notebook.
+            Upload a document or add a YouTube video. Gemini will index it for your notebook.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="pdf" className="w-full">
+        <Tabs defaultValue="document" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="pdf" className="gap-1.5">
+            <TabsTrigger value="document" className="gap-1.5">
               <FileText className="size-3.5" />
-              PDF
+              Document
             </TabsTrigger>
             <TabsTrigger value="youtube" className="gap-1.5">
               <Video className="size-3.5" />
@@ -150,30 +151,30 @@ export function AddMaterialDialog({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pdf" className="space-y-3 mt-4">
+          <TabsContent value="document" className="space-y-3 mt-4">
             <p className="text-xs text-muted-foreground">
-              Max 4 MB. Must be a valid PDF file.
+              Max 4 MB. PDF, DOCX, TXT, or Markdown.
             </p>
-            {pdfError && (
+            {fileError && (
               <Alert variant="destructive">
-                <AlertDescription className="text-xs">{pdfError}</AlertDescription>
+                <AlertDescription className="text-xs">{fileError}</AlertDescription>
               </Alert>
             )}
             <input
               ref={fileInputRef}
               type="file"
-              accept="application/pdf"
+              accept={MATERIAL_UPLOAD_ACCEPT}
               className="hidden"
-              onChange={handlePdfUpload}
-              disabled={uploadingPdf}
+              onChange={handleFileUpload}
+              disabled={uploadingFile}
             />
             <button
               type="button"
-              disabled={uploadingPdf}
+              disabled={uploadingFile}
               onClick={() => fileInputRef.current?.click()}
               className="w-full flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/40 px-4 py-8 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
             >
-              {uploadingPdf ? (
+              {uploadingFile ? (
                 <>
                   <Loader2 className="size-5 animate-spin" />
                   <span>Uploading…</span>

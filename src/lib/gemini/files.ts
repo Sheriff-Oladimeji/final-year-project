@@ -2,6 +2,7 @@ import type { Part } from "@google/genai";
 import { getClient } from "./client";
 import { setMaterialStatus } from "@/db/queries/materials";
 import type { Material } from "@/db/schema";
+import { mimeTypeForKind, type MaterialKind } from "@/lib/materials";
 
 export async function uploadBytes(
   content: Buffer,
@@ -35,12 +36,12 @@ export async function deleteGeminiFile(fileSearchId: string): Promise<void> {
 }
 
 export function buildFileParts(
-  files: Array<{ fileSearchId: string; kind: string }>,
+  files: Array<{ fileSearchId: string; kind: MaterialKind }>,
 ): Part[] {
   return files.map((f) => ({
     fileData: {
       fileUri: `https://generativelanguage.googleapis.com/v1beta/${f.fileSearchId}`,
-      mimeType: f.kind === "pdf" ? "application/pdf" : "text/plain",
+      mimeType: mimeTypeForKind(f.kind),
     },
   }));
 }
@@ -55,9 +56,9 @@ function isRecentlyIndexed(material: Material): boolean {
 
 export async function getActiveFiles(
   materials: Material[],
-): Promise<Array<{ fileSearchId: string; kind: string }>> {
+): Promise<Array<{ fileSearchId: string; kind: MaterialKind }>> {
   const results = await Promise.all(
-    materials.map(async (material): Promise<{ fileSearchId: string; kind: string } | null> => {
+    materials.map(async (material): Promise<{ fileSearchId: string; kind: MaterialKind } | null> => {
       if (!material.fileSearchId) return null;
 
       let fileId = material.fileSearchId;
@@ -86,9 +87,9 @@ export async function getActiveFiles(
         }
       }
 
-      return { fileSearchId: fileId, kind: material.kind };
+      return { fileSearchId: fileId, kind: material.kind as MaterialKind };
     }),
   );
 
-  return results.filter((r): r is { fileSearchId: string; kind: string } => r !== null);
+  return results.filter((r): r is { fileSearchId: string; kind: MaterialKind } => r !== null);
 }

@@ -1,6 +1,7 @@
 import type { FilePart } from "ai";
 import { getActiveFiles } from "@/lib/gemini/files";
 import type { Material } from "@/db/schema";
+import { mimeTypeForKind } from "@/lib/materials";
 
 // Builds AI SDK FileParts for an array of materials in a notebook. Each
 // material gets one FilePart. getActiveFiles handles 48h Gemini Files API
@@ -16,6 +17,6 @@ export async function buildFileContentParts(materials: Material[]): Promise<File
   return files.map<FilePart>((f) => ({
     type: "file",
     data: new URL(`https://generativelanguage.googleapis.com/v1beta/${f.fileSearchId}`),
-    mediaType: f.kind === "pdf" ? "application/pdf" : "text/plain",
+    mediaType: mimeTypeForKind(f.kind),
   }));
 }

@@ -1,3 +1,7 @@
+import type { MaterialKind } from "@/lib/materials";
+
+export type { MaterialKind };
+
 export type UserRole = "student" | "admin";
 
 export interface User {
@@ -19,7 +23,6 @@ export interface Notebook {
   updated_at: string;
 }
 
-export type MaterialKind = "pdf" | "youtube";
 export type MaterialStatus = "pending" | "ready" | "failed";
 
 export interface Material {

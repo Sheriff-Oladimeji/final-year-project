@@ -24,7 +24,15 @@ import {
 import { AddMaterialDialog } from "@/components/materials/AddMaterialDialog";
 import { deleteMaterialAction } from "@/actions/materials";
 import { cn } from "@/lib/utils";
+import { MATERIAL_KIND_LABELS, type UploadableMaterialKind } from "@/lib/materials";
 import type { Material } from "@/types";
+
+const KIND_ICON_STYLES: Record<UploadableMaterialKind, { bg: string; text: string }> = {
+  pdf: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-600 dark:text-red-400" },
+  docx: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-600 dark:text-blue-400" },
+  txt: { bg: "bg-slate-100 dark:bg-slate-800/60", text: "text-slate-600 dark:text-slate-400" },
+  markdown: { bg: "bg-violet-100 dark:bg-violet-900/30", text: "text-violet-600 dark:text-violet-400" },
+};
 
 interface SourcesPanelProps {
   notebookId: string;
@@ -74,7 +82,7 @@ export function SourcesPanel({ notebookId, materials, cap, mobileOpen = false, o
 
       {materials.length === 0 ? (
         <p className="text-xs text-muted-foreground px-1 py-2">
-          No sources yet. Add a PDF or YouTube video above.
+          No sources yet. Add a document or YouTube video above.
         </p>
       ) : (
         <ul className="space-y-1 mt-1">
@@ -201,14 +209,21 @@ function SourceRow({ material }: { material: Material }) {
 
   return (
     <li className="group flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/60 transition-colors">
-      {material.kind === "pdf" ? (
-        <div className="size-9 shrink-0 rounded-lg flex flex-col items-center justify-center gap-0.5 bg-red-100 dark:bg-red-900/30">
-          <FileText className="size-4 text-red-600 dark:text-red-400" />
-          <span className="text-[8px] font-bold text-red-600 dark:text-red-400 leading-none">PDF</span>
-        </div>
-      ) : (
+      {material.kind === "youtube" ? (
         <div className="size-9 shrink-0 rounded-lg flex items-center justify-center bg-red-100 dark:bg-red-900/30">
           <YouTubeIcon />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "size-9 shrink-0 rounded-lg flex flex-col items-center justify-center gap-0.5",
+            KIND_ICON_STYLES[material.kind].bg,
+          )}
+        >
+          <FileText className={cn("size-4", KIND_ICON_STYLES[material.kind].text)} />
+          <span className={cn("text-[8px] font-bold leading-none", KIND_ICON_STYLES[material.kind].text)}>
+            {MATERIAL_KIND_LABELS[material.kind]}
+          </span>
         </div>
       )}
       <div className="flex-1 min-w-0">

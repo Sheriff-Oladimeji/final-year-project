@@ -17,6 +17,7 @@ import { getNotebook, touchNotebook } from "@/db/queries/notebooks";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadDocumentToStore, deleteDocumentFromStore } from "@/lib/gemini/fileSearch";
 import { generateMaterialSuggestions } from "@/lib/ai/suggestions";
+import { detectMaterialKind, mimeTypeForKind } from "@/lib/materials";
 
 async function requireUser() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -48,7 +49,7 @@ async function persistSuggestions(materialId: string, userId: string) {
   }
 }
 
-export async function uploadPdfAction(formData: FormData) {
+export async function uploadMaterialAction(formData: FormData) {
   const session = await requireUser();
   if ("error" in session) return session;
 
@@ -58,8 +59,10 @@ export async function uploadPdfAction(formData: FormData) {
   if (capCheck) return capCheck;
 
   const file = formData.get("file") as File | null;
-  if (!file || file.type !== "application/pdf") {
-    return { error: "Please upload a valid PDF file." };
+  if (!file) return { error: "Please choose a file to upload." };
+  const kind = detectMaterialKind(file);
+  if (!kind) {
+    return { error: "Please upload a PDF, DOCX, TXT, or Markdown file." };
   }
 
   const nb = await getNotebook(notebookId, session.user.id);
@@ -68,7 +71,7 @@ export async function uploadPdfAction(formData: FormData) {
   const material = await createMaterial({
     userId: session.user.id,
     notebookId,
-    kind: "pdf",
+    kind,
     displayName: file.name,
     sourceUri: file.name,
   });
@@ -82,12 +85,12 @@ export async function uploadPdfAction(formData: FormData) {
 
   after(async () => {
     try {
-      const documentName = await uploadDocumentToStore(storeName, buffer, "application/pdf", fileName);
+      const documentName = await uploadDocumentToStore(storeName, buffer, mimeTypeForKind(kind), fileName);
       await setMaterialStatus(materialId, "ready", { fileSearchId: documentName, indexedAt: new Date() });
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
     } catch (err) {
-      console.error("[uploadPdfAction] after() failed:", err);
+      console.error("[uploadMaterialAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");
     }
   });
