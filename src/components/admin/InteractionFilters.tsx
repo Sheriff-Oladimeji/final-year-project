@@ -47,6 +47,7 @@ export function InteractionFilters() {
             <SelectItem value="correct">Correct</SelectItem>
             <SelectItem value="correct_with_hint">Correct with hint</SelectItem>
             <SelectItem value="incorrect">Incorrect</SelectItem>
+            <SelectItem value="give_up">Gave up</SelectItem>
             <SelectItem value="unscored">Unscored</SelectItem>
           </SelectContent>
         </Select>

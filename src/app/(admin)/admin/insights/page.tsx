@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { getStudentAnalytics } from "@/db/queries/analytics";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -142,7 +143,11 @@ export default async function AdminInsightsPage() {
                   const gaveUp = s.correctnessCounts.give_up ?? 0;
                   return (
                     <TableRow key={s.userId}>
-                      <TableCell className="font-medium text-sm">{s.email}</TableCell>
+                      <TableCell className="font-medium text-sm">
+                        <Link href={`/admin/insights/${s.userId}`} className="hover:underline underline-offset-2">
+                          {s.email}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-right text-sm">{s.totalInteractions}</TableCell>
                       <TableCell className="text-right text-sm">{s.sessionCount}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{s.avgSessionLengthMinutes}m</TableCell>

@@ -1,9 +1,9 @@
 import { eq, and, desc, asc, gte, lte, count } from "drizzle-orm";
 import { db } from "@/db";
-import { interactions, user } from "@/db/schema";
+import { interactions, user, topics } from "@/db/schema";
 import type { Interaction } from "@/db/schema";
 
-export type InteractionWithEmail = Interaction & { userEmail: string };
+export type InteractionWithEmail = Interaction & { userEmail: string; topicName: string };
 
 export async function createInteraction(data: {
   userId: string;
@@ -83,15 +83,16 @@ export async function listInteractionsAdmin(params: {
   if (params.toDate)   conditions.push(lte(interactions.createdAt, params.toDate));
 
   const rows = await db
-    .select({ interaction: interactions, userEmail: user.email })
+    .select({ interaction: interactions, userEmail: user.email, topicName: topics.name })
     .from(interactions)
     .innerJoin(user, eq(interactions.userId, user.id))
+    .innerJoin(topics, eq(interactions.topicId, topics.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(interactions.createdAt))
     .limit(params.limit ?? 200)
     .offset(params.skip ?? 0);
 
-  return rows.map(({ interaction, userEmail }) => ({ ...interaction, userEmail }));
+  return rows.map(({ interaction, userEmail, topicName }) => ({ ...interaction, userEmail, topicName }));
 }
 
 export async function countAllInteractions(): Promise<number> {
