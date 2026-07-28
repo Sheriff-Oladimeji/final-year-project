@@ -15,6 +15,9 @@ import { sql } from "drizzle-orm";
 // Column names and types MUST match what Better Auth expects exactly.
 // Do NOT rename or reorder these — BA's Drizzle adapter maps to them by name.
 
+// The `user` table is students only. Admin accounts live in a fully separate
+// table set below (adminUser/adminSession/adminAccount/adminVerification) —
+// two independent Better Auth instances, not one table with a role check.
 export const user = pgTable("user", {
   id:            text("id").primaryKey(),
   name:          text("name").notNull(),
@@ -23,9 +26,13 @@ export const user = pgTable("user", {
   image:         text("image"),
   createdAt:     timestamp("created_at").notNull(),
   updatedAt:     timestamp("updated_at").notNull(),
+  // Required by Better Auth's `admin` plugin schema (src/lib/auth.ts). No
+  // student row is ever given the "admin" role — real admins never touch
+  // this table — but the plugin's own databaseHooks expect this column.
   role:          text("role").notNull().default("student"),
-  isAdmin:       boolean("is_admin").notNull().default(false),
-  disabledAt:    timestamp("disabled_at"),
+  banned:        boolean("banned").notNull().default(false),
+  banReason:     text("ban_reason"),
+  banExpires:    timestamp("ban_expires"),
 });
 
 export const session = pgTable("session", {
@@ -37,6 +44,8 @@ export const session = pgTable("session", {
   ipAddress:   text("ip_address"),
   userAgent:   text("user_agent"),
   userId:      text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  // Required by the `admin` plugin schema (impersonation support).
+  impersonatedBy: text("impersonated_by"),
 });
 
 export const account = pgTable("account", {
@@ -56,6 +65,57 @@ export const account = pgTable("account", {
 });
 
 export const verification = pgTable("verification", {
+  id:         text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value:      text("value").notNull(),
+  expiresAt:  timestamp("expires_at").notNull(),
+  createdAt:  timestamp("created_at"),
+  updatedAt:  timestamp("updated_at"),
+});
+
+// ── Admin auth tables (separate Better Auth instance, src/lib/admin-auth.ts) ──
+// Physically independent from the student `user` table above. An admin
+// session can never exist here by way of a student signing up — the only
+// way a row appears is the one-time /admin/setup page.
+
+export const adminUser = pgTable("admin_user", {
+  id:            text("id").primaryKey(),
+  name:          text("name").notNull(),
+  email:         text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image:         text("image"),
+  createdAt:     timestamp("created_at").notNull(),
+  updatedAt:     timestamp("updated_at").notNull(),
+});
+
+export const adminSession = pgTable("admin_session", {
+  id:        text("id").primaryKey(),
+  expiresAt: timestamp("expires_at").notNull(),
+  token:     text("token").notNull().unique(),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  userId:    text("user_id").notNull().references(() => adminUser.id, { onDelete: "cascade" }),
+});
+
+export const adminAccount = pgTable("admin_account", {
+  id:                    text("id").primaryKey(),
+  accountId:             text("account_id").notNull(),
+  providerId:            text("provider_id").notNull(),
+  userId:                text("user_id").notNull().references(() => adminUser.id, { onDelete: "cascade" }),
+  accessToken:           text("access_token"),
+  refreshToken:          text("refresh_token"),
+  idToken:               text("id_token"),
+  accessTokenExpiresAt:  timestamp("access_token_expires_at"),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+  scope:                 text("scope"),
+  password:              text("password"),
+  createdAt:             timestamp("created_at").notNull(),
+  updatedAt:             timestamp("updated_at").notNull(),
+});
+
+export const adminVerification = pgTable("admin_verification", {
   id:         text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value:      text("value").notNull(),
@@ -150,6 +210,7 @@ export const interactions = pgTable(
 // Type exports
 export type User        = typeof user.$inferSelect;
 export type Session     = typeof session.$inferSelect;
+export type AdminUser   = typeof adminUser.$inferSelect;
 export type Notebook    = typeof notebooks.$inferSelect;
 export type Material    = typeof materials.$inferSelect;
 export type Topic       = typeof topics.$inferSelect;

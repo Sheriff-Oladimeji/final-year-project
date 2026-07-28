@@ -19,9 +19,9 @@ export default async function AdminUsersPage() {
   const users: UserAdmin[] = rawUsers.map((u) => ({
     id: u.id,
     email: u.email,
-    role: u.role as UserAdmin["role"],
     created_at: u.createdAt.toISOString(),
-    disabled_at: u.disabledAt?.toISOString() ?? null,
+    banned: u.banned,
+    ban_reason: u.banReason,
   }));
 
   return (
@@ -43,7 +43,6 @@ export default async function AdminUsersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-0" />
@@ -53,21 +52,17 @@ export default async function AdminUsersPage() {
               {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium text-sm">{user.email}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="capitalize text-xs">
-                      {user.role}
-                    </Badge>
-                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(user.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    {user.disabled_at ? (
+                    {user.banned ? (
                       <Badge
                         variant="outline"
                         className="text-xs text-red-700 border-red-200 bg-red-50"
+                        title={user.ban_reason ?? undefined}
                       >
-                        Disabled
+                        Banned
                       </Badge>
                     ) : (
                       <Badge

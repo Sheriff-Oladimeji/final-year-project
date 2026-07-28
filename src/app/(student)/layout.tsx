@@ -6,6 +6,6 @@ import { auth } from "@/lib/auth";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.disabledAt) redirect("/");
+  if (!session || session.user.banned) redirect("/");
   return <>{children}</>;
 }

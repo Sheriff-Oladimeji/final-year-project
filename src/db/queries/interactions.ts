@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, count } from "drizzle-orm";
 import { db } from "@/db";
 import { interactions, user } from "@/db/schema";
 import type { Interaction } from "@/db/schema";
@@ -91,4 +91,9 @@ export async function listInteractionsAdmin(params: {
     .offset(params.skip ?? 0);
 
   return rows.map(({ interaction, userEmail }) => ({ ...interaction, userEmail }));
+}
+
+export async function countAllInteractions(): Promise<number> {
+  const rows = await db.select({ n: count() }).from(interactions);
+  return rows[0]?.n ?? 0;
 }

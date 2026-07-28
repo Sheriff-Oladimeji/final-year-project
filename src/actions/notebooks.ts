@@ -17,7 +17,7 @@ import {
 
 async function requireUser() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.disabledAt) {
+  if (!session || session.user.banned) {
     return { error: "Unauthorised" } as const;
   }
   return session;

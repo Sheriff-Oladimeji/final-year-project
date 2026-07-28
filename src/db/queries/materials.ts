@@ -84,3 +84,8 @@ export async function listReadyMaterialsInNotebook(
   const all = await listMaterialsByNotebook(userId, notebookId);
   return all.filter((m) => m.status === "ready");
 }
+
+export async function countAllMaterials(): Promise<number> {
+  const rows = await db.select({ n: count() }).from(materials);
+  return rows[0]?.n ?? 0;
+}

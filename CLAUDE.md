@@ -22,8 +22,10 @@ npm run build         # production build (also type-checks)
 npm run db:generate   # generate Drizzle migrations
 npm run db:migrate    # apply migrations
 npm run db:studio     # visual DB browser
-npm run seed:admin    # create/promote admin user
 ```
+
+The admin account is created via `/admin/setup` in the browser, not a
+script — see the Auth section below.
 
 ---
 
@@ -38,17 +40,31 @@ Two roles: **student** and **admin**.
 
 ---
 
-## Auth — Better Auth + magic links
+## Auth — two separate Better Auth instances
 
-Authentication is handled entirely by **Better Auth** (`src/lib/auth.ts`).
+Students and admins are **not** the same account system. There is no shared
+`role` column that distinguishes them — they live in physically separate
+tables behind two independent Better Auth instances.
 
-- **No passwords.** Everyone signs in via magic link (email → link → signed in).
-- Magic links are sent via **Resend**.
-- Better Auth manages the `user`, `session`, `account`, `verification` tables.
-- Role (`student` | `admin`) is a custom field on the `user` table.
-- Server-side session: `await auth.api.getSession({ headers: await headers() })`
-- Client-side signout: `authClient.signOut()` from `@/lib/auth-client`
-- All BA routes are handled by `src/app/api/auth/[...all]/route.ts`
+- **Students**: `src/lib/auth.ts`, tables `user`/`session`/`account`/`verification`,
+  routes under `src/app/api/auth/[...all]/route.ts`. Email + password,
+  self-registration open, no email verification required. Uses Better
+  Auth's `admin` plugin for the `banned`/`banReason`/`banExpires` ban
+  mechanism — sign-in is auto-rejected for banned rows.
+- **Admins**: `src/lib/admin-auth.ts`, tables `admin_user`/`admin_session`/
+  `admin_account`/`admin_verification`, routes under
+  `src/app/api/auth/admin/[...all]/route.ts`. Email + password, no
+  sign-up — the only admin account is created once, through `/admin/setup`
+  (`src/app/admin/setup/page.tsx`). That page checks `countAdminUsers()`
+  and redirects to `/admin/login` the moment one exists; the same check
+  is repeated inside `createFirstAdminAction` (`src/actions/admin-setup.ts`)
+  so it can't be bypassed by hitting the action directly.
+  Distinct cookie prefix (`advanced.cookiePrefix: "admin-auth"`) so a
+  browser can hold both a student and an admin session at once.
+- Server-side session: `auth.api.getSession(...)` (student) or
+  `adminAuth.api.getSession(...)` (admin), both passed `{ headers: await headers() }`.
+- Client-side signout: `authClient.signOut()` / `adminAuthClient.signOut()`.
+- Both flows have a Resend-backed forgot-password email.
 
 ---
 
@@ -67,18 +83,18 @@ Authentication is handled entirely by **Better Auth** (`src/lib/auth.ts`).
 ```
 src/
   app/
-    api/auth/[...all]/   Better Auth catch-all handler
+    api/auth/[...all]/   Student Better Auth catch-all handler
+    api/auth/admin/[...all]/  Admin Better Auth catch-all handler
     (student)/           Student route group (auth-guarded)
     (admin)/             Admin route group (auth-guarded)
-    page.tsx             Landing page with magic link form
+    page.tsx             Landing page with sign-in/sign-up form
   actions/               Server Actions ("use server")
-    auth.ts              logoutAction
+    auth.ts              logoutAction, adminLogoutAction
     materials.ts         upload/delete materials
-    chat.ts              askAction, replyAction
-    admin.ts             disableUserAction, deleteUserAction
+    admin.ts             disableUserAction (ban), enableUserAction (unban), deleteUserAction
   components/
     ui/                  shadcn primitives (do not edit)
-    auth/                MagicLinkForm
+    auth/                SignInForm, AdminLoginForm, ForgotPasswordForm, ResetPasswordForm
     chat/                ChatThread
     materials/           MaterialsPage
     dashboard/           TopicCard, Sparkline

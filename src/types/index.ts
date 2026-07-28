@@ -2,17 +2,15 @@ import type { MaterialKind } from "@/lib/materials";
 
 export type { MaterialKind };
 
-export type UserRole = "student" | "admin";
-
 export interface User {
   id: string;
   email: string;
-  role: UserRole;
   created_at: string;
 }
 
 export interface UserAdmin extends User {
-  disabled_at: string | null;
+  banned: boolean;
+  ban_reason: string | null;
 }
 
 export interface Notebook {

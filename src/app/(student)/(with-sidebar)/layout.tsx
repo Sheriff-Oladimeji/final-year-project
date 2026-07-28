@@ -7,7 +7,7 @@ export default async function WithSidebarLayout({ children }: { children: React.
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <StudentSidebar isAdmin={session?.user.isAdmin ?? false} userEmail={session?.user.email ?? ""} />
+      <StudentSidebar userEmail={session?.user.email ?? ""} />
       <main className="flex-1 min-w-0 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
     </div>
   );

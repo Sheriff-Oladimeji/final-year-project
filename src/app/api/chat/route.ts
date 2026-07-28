@@ -160,7 +160,7 @@ export async function POST(req: Request) {
 
   try {
     session = await auth.api.getSession({ headers: await headers() });
-    if (!session || session.user.disabledAt) {
+    if (!session || session.user.banned) {
       return new Response("Unauthorised", { status: 401 });
     }
 

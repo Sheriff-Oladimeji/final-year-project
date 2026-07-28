@@ -2,22 +2,22 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
-import { disableUser, enableUser, deleteUser } from "@/db/queries/users";
+import { adminAuth } from "@/lib/admin-auth";
+import { banUser, unbanUser, deleteUser } from "@/db/queries/users";
 
 async function requireAdmin() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !session.user.isAdmin) {
+  const session = await adminAuth.api.getSession({ headers: await headers() });
+  if (!session) {
     return { error: "Unauthorised" } as const;
   }
   return null;
 }
 
-export async function disableUserAction(userId: string) {
+export async function disableUserAction(userId: string, reason?: string) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  await disableUser(userId);
+  await banUser(userId, reason);
   revalidatePath("/admin/users");
   return { data: { success: true } };
 }
@@ -26,7 +26,7 @@ export async function enableUserAction(userId: string) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  await enableUser(userId);
+  await unbanUser(userId);
   revalidatePath("/admin/users");
   return { data: { success: true } };
 }

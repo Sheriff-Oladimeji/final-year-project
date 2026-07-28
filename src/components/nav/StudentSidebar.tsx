@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, BrainCircuit, ShieldCheck, Menu, X } from "lucide-react";
+import { LayoutDashboard, LogOut, BrainCircuit, Menu, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -13,11 +13,10 @@ const links = [
 ];
 
 interface StudentSidebarProps {
-  isAdmin: boolean;
   userEmail: string;
 }
 
-export function StudentSidebar({ isAdmin, userEmail }: StudentSidebarProps) {
+export function StudentSidebar({ userEmail }: StudentSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -110,18 +109,6 @@ export function StudentSidebar({ isAdmin, userEmail }: StudentSidebarProps) {
             </Link>
           );
         })}
-
-        {isAdmin && (
-          <div className="pt-2 mt-2 border-t border-border">
-            <Link
-              href="/admin/users"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
-            >
-              <ShieldCheck className="size-4 shrink-0 text-primary" />
-              Admin Panel
-            </Link>
-          </div>
-        )}
       </nav>
 
       {/* Footer: user + sign out (always visible) */}

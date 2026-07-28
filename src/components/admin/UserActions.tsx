@@ -29,7 +29,7 @@ export function UserActions({ user }: UserActionsProps) {
   async function handleToggle() {
     setBusy(true);
     try {
-      if (isDisabled) {
+      if (isBanned) {
         await enableUserAction(user.id);
       } else {
         await disableUserAction(user.id);
@@ -51,7 +51,7 @@ export function UserActions({ user }: UserActionsProps) {
     }
   }
 
-  const isDisabled = user.disabled_at !== null;
+  const isBanned = user.banned;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -60,17 +60,17 @@ export function UserActions({ user }: UserActionsProps) {
         size="xs"
         disabled={busy}
         onClick={handleToggle}
-        title={isDisabled ? "Re-enable account" : "Disable account"}
-        className={isDisabled ? "text-green-700 border-green-200 hover:bg-green-50" : ""}
+        title={isBanned ? "Re-enable account" : "Disable account"}
+        className={isBanned ? "text-green-700 border-green-200 hover:bg-green-50" : ""}
       >
         {busy ? (
           <Loader2 className="size-3 animate-spin" />
-        ) : isDisabled ? (
+        ) : isBanned ? (
           <CheckCircle className="size-3" />
         ) : (
           <Ban className="size-3" />
         )}
-        {isDisabled ? "Re-enable" : "Disable"}
+        {isBanned ? "Re-enable" : "Disable"}
       </Button>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

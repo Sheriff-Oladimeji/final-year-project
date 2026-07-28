@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, ScrollText, ShieldCheck, LayoutDashboard, LogOut } from "lucide-react";
-import { authClient } from "@/lib/auth-client";
+import { adminAuthClient } from "@/lib/admin-auth-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 const links = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/interactions", label: "Interactions", icon: ScrollText },
 ];
@@ -24,8 +25,8 @@ export function AdminSidebar({ userEmail }: AdminSidebarProps) {
 
   async function handleSignOut() {
     setSigningOut(true);
-    await authClient.signOut();
-    router.push("/");
+    await adminAuthClient.signOut();
+    router.push("/admin/login");
     router.refresh();
   }
 
@@ -44,7 +45,7 @@ export function AdminSidebar({ userEmail }: AdminSidebarProps) {
       {/* Nav */}
       <nav className="flex-1 min-h-0 overflow-y-auto space-y-0.5 p-3">
         {links.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
+          const active = href === "/admin" ? pathname === href : pathname.startsWith(href);
           return (
             <Link
               key={href}
@@ -61,16 +62,6 @@ export function AdminSidebar({ userEmail }: AdminSidebarProps) {
             </Link>
           );
         })}
-
-        <div className="pt-2 border-t border-border mt-2">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
-          >
-            <LayoutDashboard className="size-4 shrink-0" />
-            Student View
-          </Link>
-        </div>
       </nav>
 
       {/* Footer: user + sign out */}

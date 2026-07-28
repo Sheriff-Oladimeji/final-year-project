@@ -1,13 +1,17 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { AdminMagicLinkForm } from "@/components/auth/AdminMagicLinkForm";
+import { adminAuth } from "@/lib/admin-auth";
+import { AdminLoginForm } from "@/components/auth/AdminLoginForm";
+import { countAdminUsers } from "@/db/queries/admin-users";
 
 export default async function AdminLoginPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (session?.user?.role === "admin") redirect("/admin/users");
+  const session = await adminAuth.api.getSession({ headers: await headers() });
+  if (session?.user) redirect("/admin/users");
+
+  const adminCount = await countAdminUsers();
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 px-4">
@@ -23,10 +27,10 @@ export default async function AdminLoginPage() {
           <div className="space-y-1">
             <h2 className="text-sm font-medium">Admin sign in</h2>
             <p className="text-xs text-muted-foreground">
-              Only registered admin accounts can receive a link.
+              Admin accounts are pre-created. There is no sign-up here.
             </p>
           </div>
-          <AdminMagicLinkForm />
+          <AdminLoginForm />
         </div>
       </div>
     </div>

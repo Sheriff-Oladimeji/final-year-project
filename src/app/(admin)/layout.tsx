@@ -2,12 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { adminAuth } from "@/lib/admin-auth";
 import { AdminSidebar } from "@/components/nav/AdminSidebar";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !session.user.isAdmin) redirect("/");
+  const session = await adminAuth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/admin/login");
 
   return (
     <div className="flex min-h-screen">

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { MagicLinkForm } from "@/components/auth/MagicLinkForm";
+import { SignInForm } from "@/components/auth/SignInForm";
 import { BookOpen, BrainCircuit, TrendingUp } from "lucide-react";
 
 const features = [
@@ -75,13 +75,13 @@ export default async function LandingPage() {
             <div className="border-b border-border px-6 py-5">
               <h2 className="text-base font-semibold text-card-foreground">Sign in to LearnAI</h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Enter your email — we&apos;ll send a sign-in link. No password needed.
+                Sign in with your email and password, or create a new account.
               </p>
             </div>
 
             {/* Card body */}
             <div className="px-6 py-5">
-              <MagicLinkForm />
+              <SignInForm />
             </div>
           </div>
 

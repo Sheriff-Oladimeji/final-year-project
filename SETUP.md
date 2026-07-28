@@ -32,12 +32,14 @@ Edit `.env.local`:
 | `BETTER_AUTH_URL` | Your app URL (http://localhost:3000 for dev) |
 | `NEXT_PUBLIC_APP_URL` | Same as BETTER_AUTH_URL |
 | `RESEND_API_KEY` | resend.com → API Keys |
-| `EMAIL_FROM` | Verified Resend sender, e.g. `LearnAI <noreply@yourdomain.com>` |
 | `GEMINI_API_KEY` | aistudio.google.com → Get API key |
-| `ADMIN_EMAIL` | The email address you want as admin |
 
-Resend free-tier note: without a verified domain you can only send to your own inbox.
-For local testing set EMAIL_FROM to `onboarding@resend.dev`.
+There's no admin credential to configure here — the admin account is
+created through a one-time setup page after migrations run (Step 6).
+
+Resend is only used for password-reset emails — it's not required for normal
+sign-in. Without a verified domain you can only send to your own inbox on
+the free tier.
 
 ---
 
@@ -56,19 +58,19 @@ npm run db:generate   # generates SQL from src/db/schema.ts
 npm run db:migrate    # applies to your database
 ```
 
-Creates all tables: Better Auth tables (user, session, account, verification)
-and app tables (materials, topics, interactions).
+Creates all tables: student auth tables (user, session, account, verification),
+admin auth tables (admin_user, admin_session, admin_account, admin_verification —
+a fully separate table set, not a shared role column), and app tables
+(notebooks, materials, topics, interactions).
 
 ---
 
 ## 6. Create the admin account
 
-```bash
-npm run seed:admin
-```
-
-This reads ADMIN_EMAIL from .env.local and creates a user with role="admin".
-The admin signs in via magic link — no password needed.
+Go to http://localhost:3000/admin/setup and fill in a name, email, and
+password. This page only works once — the moment an admin account exists,
+it locks itself and redirects to `/admin/login` instead, no matter how
+it's reached. There's no script and nothing to put in `.env`.
 
 ---
 
@@ -84,13 +86,18 @@ Visit http://localhost:3000
 
 ## How sign-in works
 
-1. Go to http://localhost:3000
-2. Enter your email address
-3. Click "Send sign-in link"
-4. Open the email, click the link (expires in 5 minutes)
-5. You are signed in automatically:
-   - Students go to /dashboard
-   - Admins go to /admin/users
+Students and admins sign in on separate pages with email + password —
+they are not the same account system.
+
+- **Students**: go to http://localhost:3000, use the "Create account" tab
+  on first visit, then "Sign in" afterwards. Self-registration is open —
+  no manual setup needed.
+- **Admins**: go to http://localhost:3000/admin/login. There is no sign-up
+  tab here — the only admin account is the one created through
+  `/admin/setup` (Step 6), and that page can only be used once.
+
+Both flows have a "Forgot password?" link that emails a reset link via
+Resend.
 
 ---
 
@@ -102,36 +109,30 @@ npm run build         # production build + type-check
 npm run db:generate   # regenerate migrations after schema changes
 npm run db:migrate    # apply pending migrations
 npm run db:studio     # open Drizzle Studio (visual DB browser)
-npm run seed:admin    # create or promote admin user
 ```
 
 ---
 
 ## Students
 
-Students self-register on first sign-in. When a new email requests a magic
-link and no account exists, Better Auth creates a new user with role="student".
-No manual setup needed.
+Students self-register with email + password on the landing page. No
+manual setup needed — there is no admin approval step.
 
 ---
 
-## Promoting a user to admin
+## Changing the admin password
 
-Set ADMIN_EMAIL to their address and run:
-
-```bash
-npm run seed:admin
-```
-
-If they already exist their role is updated to admin.
+There's no reset script. Use the "Forgot password?" link on
+`/admin/login` — it emails a reset link the same way the student flow
+does. `/admin/setup` cannot be reused once an admin account exists.
 
 ---
 
 ## Production checklist
 
 - [ ] Set BETTER_AUTH_URL and NEXT_PUBLIC_APP_URL to your real domain
-- [ ] Verify sending domain in Resend, update EMAIL_FROM
+- [ ] Verify sending domain in Resend (used for password-reset emails)
 - [ ] Use a strong BETTER_AUTH_SECRET (32+ random chars)
 - [ ] Point DATABASE_URL to production DB
 - [ ] Run db:migrate against production DB
-- [ ] Run seed:admin with your real admin email
+- [ ] Visit /admin/setup once to create the real admin account
