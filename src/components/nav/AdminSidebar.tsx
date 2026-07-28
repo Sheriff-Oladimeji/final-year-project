@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, ScrollText, ShieldCheck, LayoutDashboard, LogOut } from "lucide-react";
+import { Users, ScrollText, ShieldCheck, LayoutDashboard, LogOut, BarChart3 } from "lucide-react";
 import { adminAuthClient } from "@/lib/admin-auth-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { useState } from "react";
 const links = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/insights", label: "Insights", icon: BarChart3 },
   { href: "/admin/interactions", label: "Interactions", icon: ScrollText },
 ];
 

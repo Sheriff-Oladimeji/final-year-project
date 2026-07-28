@@ -144,6 +144,7 @@ function parseCorrectness(raw: string): Correctness {
 
 
 export async function POST(req: Request) {
+  const requestStartedAt = Date.now();
   let session: Awaited<ReturnType<typeof auth.api.getSession>>;
   let body: ChatRequestBody;
   let userText: string;
@@ -260,6 +261,7 @@ export async function POST(req: Request) {
           question: interaction.question,
           retrievedContext: JSON.stringify(sourceItems),
           promptTemplate: "reveal", response: text,
+          latencyMs: Date.now() - requestStartedAt,
         });
         await touchNotebook(notebookId, userId);
 
@@ -317,6 +319,7 @@ export async function POST(req: Request) {
           question: interaction.question,
           retrievedContext: JSON.stringify(sourceItems),
           promptTemplate: isCorrect ? "progress" : "answer", response: text,
+          latencyMs: Date.now() - requestStartedAt,
         });
         await touchNotebook(notebookId, userId);
 
@@ -357,6 +360,7 @@ export async function POST(req: Request) {
         question: userText,
         retrievedContext: JSON.stringify(sourceItems),
         promptTemplate: "answer", response: text,
+        latencyMs: Date.now() - requestStartedAt,
       });
       await touchNotebook(notebookId, userId);
 

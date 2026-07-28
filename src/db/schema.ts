@@ -197,6 +197,9 @@ export const interactions = pgTable(
     studentReply:     text("student_reply"),
     correctness:      varchar("correctness", { length: 30 }).notNull().default("unscored"),
     scoreDelta:       integer("score_delta").notNull().default(0),
+    // Wall-clock ms from the request landing at /api/chat to the answer being
+    // ready to persist. Null on rows written before this was added.
+    latencyMs:        integer("latency_ms"),
     createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

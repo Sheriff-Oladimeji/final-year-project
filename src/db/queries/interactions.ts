@@ -14,6 +14,7 @@ export async function createInteraction(data: {
   retrievedContext: string;
   promptTemplate: string;
   response: string;
+  latencyMs?: number;
 }): Promise<Interaction> {
   const rows = await db.insert(interactions).values(data).returning();
   return rows[0];

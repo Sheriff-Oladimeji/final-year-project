@@ -54,11 +54,17 @@ export default async function AdminOverviewPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Link href="/admin/users" className="rounded-xl border border-border p-5 transition-colors hover:border-primary/40 hover:bg-muted/40">
           <h2 className="text-sm font-medium">Manage students</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             View accounts, ban or re-enable access, or delete a student and all their data.
+          </p>
+        </Link>
+        <Link href="/admin/insights" className="rounded-xl border border-border p-5 transition-colors hover:border-primary/40 hover:bg-muted/40">
+          <h2 className="text-sm font-medium">Insights</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Session activity, correctness distribution, and response time per student.
           </p>
         </Link>
         <Link href="/admin/interactions" className="rounded-xl border border-border p-5 transition-colors hover:border-primary/40 hover:bg-muted/40">
