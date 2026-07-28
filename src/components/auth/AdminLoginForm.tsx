@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { adminAuthClient } from "@/lib/admin-auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, ShieldCheck } from "lucide-react";
@@ -62,9 +63,8 @@ export function AdminLoginForm() {
             Forgot password?
           </Link>
         </div>
-        <Input
+        <PasswordInput
           id="admin-password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

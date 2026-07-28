@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createFirstAdminAction } from "@/actions/admin-setup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, ShieldCheck } from "lucide-react";
@@ -65,9 +66,8 @@ export function AdminSetupForm() {
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="setup-password">Password</Label>
-        <Input
+        <PasswordInput
           id="setup-password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

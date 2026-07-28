@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -77,9 +78,8 @@ function SignInPanel() {
             Forgot password?
           </Link>
         </div>
-        <Input
+        <PasswordInput
           id="signin-password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -155,9 +155,8 @@ function SignUpPanel() {
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="signup-password">Password</Label>
-        <Input
+        <PasswordInput
           id="signup-password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
