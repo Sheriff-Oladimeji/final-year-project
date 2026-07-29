@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { ThemeToggle } from "@/components/nav/ThemeToggle";
 
 const links = [
   { href: "/dashboard", label: "Notebooks", icon: LayoutDashboard },
@@ -121,6 +122,7 @@ export function StudentSidebar({ userEmail }: StudentSidebarProps) {
             {userEmail}
           </span>
         </div>
+        <ThemeToggle />
         <button
           onClick={handleSignOut}
           disabled={signingOut}

@@ -7,6 +7,7 @@ import { adminAuthClient } from "@/lib/admin-auth-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { ThemeToggle } from "@/components/nav/ThemeToggle";
 
 const links = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -75,6 +76,7 @@ export function AdminSidebar({ userEmail }: AdminSidebarProps) {
             {userEmail}
           </span>
         </div>
+        <ThemeToggle />
         <button
           onClick={handleSignOut}
           disabled={signingOut}
