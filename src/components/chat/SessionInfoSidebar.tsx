@@ -41,7 +41,7 @@ const TIER_META: Record<Tier, { label: string; range: string; icon: React.Compon
 
 const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }> = {
   correct: { className: "bg-emerald-500", title: "Correct" },
-  correct_with_hint: { className: "bg-amber-500", title: "Correct with hint" },
+  correct_with_hint: { className: "bg-amber-500", title: "Partially correct" },
   incorrect: { className: "bg-red-500", title: "Incorrect" },
 };
 
@@ -106,7 +106,7 @@ export function SessionInfoSidebar({
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
             {recentCorrectness.filter((c) => c === "correct").length} correct ·{" "}
-            {recentCorrectness.filter((c) => c === "correct_with_hint").length} with hints ·{" "}
+            {recentCorrectness.filter((c) => c === "correct_with_hint").length} partial ·{" "}
             {recentCorrectness.filter((c) => c === "incorrect").length} missed
           </p>
         </div>
@@ -120,7 +120,7 @@ export function SessionInfoSidebar({
         <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
           The tutor answers from your sources, then ends with a Quick check.{" "}
           Right answer <span className="text-emerald-600 font-medium">+15</span>,{" "}
-          with hint <span className="text-amber-600 font-medium">+5</span>,{" "}
+          partially correct <span className="text-amber-600 font-medium">+5</span>,{" "}
           wrong <span className="text-red-600 font-medium">−10</span>,{" "}
           skip <span className="text-muted-foreground font-medium">−5</span>.
         </p>

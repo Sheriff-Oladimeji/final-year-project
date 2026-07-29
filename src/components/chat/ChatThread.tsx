@@ -51,7 +51,7 @@ const CORRECTNESS_STYLES: Record<string, { label: string; className: string }> =
       "bg-emerald-100/80 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
   },
   correct_with_hint: {
-    label: "Correct with hint",
+    label: "Partially correct",
     className:
       "bg-amber-100/80 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
   },

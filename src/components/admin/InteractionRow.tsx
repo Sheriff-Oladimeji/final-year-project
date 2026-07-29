@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { CORRECTNESS_LABELS } from "@/lib/mastery";
 import type { InteractionWithEmail } from "@/db/queries/interactions";
 
 const CORRECTNESS_STYLES: Record<string, string> = {
@@ -38,9 +39,9 @@ export function InteractionRow({ interaction }: { interaction: InteractionWithEm
         <TableCell>
           <Badge
             variant="outline"
-            className={cn("text-xs capitalize", CORRECTNESS_STYLES[interaction.correctness] ?? "")}
+            className={cn("text-xs", CORRECTNESS_STYLES[interaction.correctness] ?? "")}
           >
-            {interaction.correctness.replace(/_/g, " ")}
+            {CORRECTNESS_LABELS[interaction.correctness] ?? interaction.correctness}
           </Badge>
         </TableCell>
         <TableCell className="text-sm font-mono">

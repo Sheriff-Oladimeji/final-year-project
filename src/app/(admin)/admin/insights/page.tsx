@@ -14,7 +14,7 @@ import {
 
 const CORRECTNESS_LABELS: Record<string, string> = {
   correct: "Correct",
-  correct_with_hint: "Correct with hint",
+  correct_with_hint: "Partially correct",
   incorrect: "Incorrect",
   give_up: "Gave up",
   unscored: "Unscored (pending reply)",
