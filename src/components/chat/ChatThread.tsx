@@ -144,7 +144,6 @@ export function ChatThread({
   return (
     <div className="flex flex-1 min-w-0 min-h-0 gap-6">
       <div className="flex flex-1 min-w-0 min-h-0 flex-col">
-      <div className="mx-auto flex w-full max-w-3xl flex-1 min-h-0 flex-col">
       <Conversation className="flex-1 min-h-0">
         <ConversationContent className="px-0">
           {messages.length === 0 && (
@@ -225,7 +224,6 @@ export function ChatThread({
           />
         </PromptInputFooter>
       </PromptInput>
-      </div>
       </div>
 
       <SessionInfoSidebar

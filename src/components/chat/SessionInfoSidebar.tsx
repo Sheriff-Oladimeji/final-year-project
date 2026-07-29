@@ -149,7 +149,7 @@ export function SessionInfoSidebar({
       )}
 
       {/* Desktop panel */}
-      <aside className="hidden xl:flex w-72 shrink-0 flex-col gap-3 overflow-y-auto">
+      <aside className="hidden xl:flex w-64 shrink-0 flex-col gap-3 overflow-y-auto">
         {cards}
       </aside>
     </>
