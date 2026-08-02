@@ -11,6 +11,7 @@ import {
   setMaterialSuggestions,
   getMaterial,
   countMaterialsInNotebook,
+  listMaterialsByNotebook,
   MATERIALS_PER_NOTEBOOK_CAP,
 } from "@/db/queries/materials";
 import { getNotebook, touchNotebook } from "@/db/queries/notebooks";
@@ -63,6 +64,14 @@ export async function uploadMaterialAction(formData: FormData) {
   const kind = detectMaterialKind(file);
   if (!kind) {
     return { error: "Please upload a PDF, DOCX, TXT, or Markdown file." };
+  }
+
+  const existingMaterials = await listMaterialsByNotebook(session.user.id, notebookId);
+  const isDuplicate = existingMaterials.some(
+    (m) => m.displayName.trim().toLowerCase() === file.name.trim().toLowerCase(),
+  );
+  if (isDuplicate) {
+    return { error: `"${file.name}" is already in this notebook. Rename the file or remove the existing one first.` };
   }
 
   const nb = await getNotebook(notebookId, session.user.id);
