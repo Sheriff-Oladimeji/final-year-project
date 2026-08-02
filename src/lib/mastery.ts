@@ -1,7 +1,7 @@
 import type { Tier } from "@/types";
 
 const DELTAS: Record<string, number> = {
-  correct: 15,
+  correct: 10,
   correct_with_hint: 5,
   incorrect: -10,
   give_up: -5,

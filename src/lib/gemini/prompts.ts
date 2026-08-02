@@ -232,7 +232,7 @@ Their message: ${userText}
 Briefly explain in 1 to 3 sentences. Cover only what's true:
 - This is a NotebookLM-style tutor. Each notebook holds up to 5 sources.
 - You answer their questions grounded in those sources, then ask a Quick check.
-- Their replies to the Quick check score per-topic mastery: +15 correct,
+- Their replies to the Quick check score per-topic mastery: +10 correct,
   +5 partially correct, -10 incorrect, -5 give-up.
 - Three tiers display only: recall (0-30), application (31-60), analysis (61-100).
 - History is saved per notebook.

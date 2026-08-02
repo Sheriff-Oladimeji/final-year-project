@@ -119,7 +119,7 @@ export function SessionInfoSidebar({
         </p>
         <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
           The tutor answers from your sources, then ends with a Quick check.{" "}
-          Right answer <span className="text-emerald-600 font-medium">+15</span>,{" "}
+          Right answer <span className="text-emerald-600 font-medium">+10</span>,{" "}
           partially correct <span className="text-amber-600 font-medium">+5</span>,{" "}
           wrong <span className="text-red-600 font-medium">−10</span>,{" "}
           skip <span className="text-muted-foreground font-medium">−5</span>.
