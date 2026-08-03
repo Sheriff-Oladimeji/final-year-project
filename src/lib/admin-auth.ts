@@ -34,6 +34,12 @@ export const adminAuth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    // Better Auth's own /sign-up/email endpoint is otherwise public and
+    // completely bypasses createFirstAdminAction's one-admin-only check —
+    // it's a separate code path, not something the /admin/setup page or
+    // its server action can intercept. Disabling it here is what actually
+    // enforces "admins are never self-registered," not the UI.
+    disableSignUp: true,
     sendResetPassword: async ({ user, url }) => {
       await resend.emails.send({
         from: "LearnAI <noreply@learnly.brikta.dev>",

@@ -130,7 +130,7 @@ import { headers } from "next/headers";
 
 const session = await auth.api.getSession({ headers: await headers() });
 if (!session) redirect("/");
-// session.user.id, session.user.role, session.user.disabledAt, session.session.id
+// session.user.id, session.user.role, session.user.banned, session.session.id
 ```
 
 ### DB query convention

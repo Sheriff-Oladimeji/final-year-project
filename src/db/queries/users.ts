@@ -1,6 +1,6 @@
 import { count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { user } from "@/db/schema";
+import { user, session } from "@/db/schema";
 import type { User } from "@/db/schema";
 
 export async function findById(id: string): Promise<User | null> {
@@ -19,12 +19,20 @@ export async function findByEmail(email: string): Promise<User | null> {
 // functions write directly via Drizzle rather than through the plugin's own
 // HTTP endpoints, since the caller here is an admin authenticated against a
 // completely separate Better Auth instance (src/lib/admin-auth.ts).
+//
+// That sign-in check only covers NEW sessions, though — it never revisits a
+// session that's already active. Without deleting existing rows here, a
+// student who is already signed in keeps full access after being banned
+// until their cookie expires on its own, which defeats the point of banning
+// them. Deleting their sessions forces `getSession()` to fail on their next
+// request, same as if they'd been signed out.
 export async function banUser(id: string, reason?: string): Promise<User> {
   const rows = await db
     .update(user)
     .set({ banned: true, banReason: reason ?? null, banExpires: null })
     .where(eq(user.id, id))
     .returning();
+  await db.delete(session).where(eq(session.userId, id));
   return rows[0];
 }
 
