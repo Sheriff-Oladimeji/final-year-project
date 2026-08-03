@@ -4,7 +4,7 @@ import { materials } from "@/db/schema";
 import type { Material } from "@/db/schema";
 import type { MaterialKind } from "@/lib/materials";
 
-export const MATERIALS_PER_NOTEBOOK_CAP = 5;
+export const MATERIALS_PER_NOTEBOOK_CAP = 10;
 
 export async function createMaterial(data: {
   userId: string;

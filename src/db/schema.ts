@@ -126,7 +126,7 @@ export const adminVerification = pgTable("admin_verification", {
 
 // ── Application tables ────────────────────────────────────────────────────────
 
-// A notebook is a container for up to 5 materials. Chat is scoped per notebook.
+// A notebook is a container for up to 10 materials. Chat is scoped per notebook.
 export const notebooks = pgTable(
   "notebooks",
   {

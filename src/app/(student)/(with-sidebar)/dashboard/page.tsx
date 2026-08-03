@@ -59,7 +59,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Notebooks</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Group up to 5 sources per notebook. Chat across them and track per-topic mastery.
+            Group up to 10 sources per notebook. Chat across them and track per-topic mastery.
           </p>
         </div>
         <NewNotebookDialog />

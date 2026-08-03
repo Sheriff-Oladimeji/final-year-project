@@ -49,7 +49,7 @@ export function NewNotebookDialog() {
           <DialogHeader>
             <DialogTitle>Create notebook</DialogTitle>
             <DialogDescription>
-              Give your notebook a name. You&apos;ll add up to 5 sources next.
+              Give your notebook a name. You&apos;ll add up to 10 sources next.
             </DialogDescription>
           </DialogHeader>
           <Input

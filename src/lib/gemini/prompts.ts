@@ -231,7 +231,7 @@ itself works (not about their notebook content).
 Their message: ${userText}
 
 Briefly explain in 1 to 3 sentences. Cover only what's true:
-- This is a NotebookLM-style tutor. Each notebook holds up to 5 sources.
+- This is a NotebookLM-style tutor. Each notebook holds up to 10 sources.
 - You answer their questions grounded in those sources, then ask a Quick check.
 - Their replies to the Quick check score per-topic mastery: +10 correct,
   +5 partially correct, -10 incorrect, -5 give-up.

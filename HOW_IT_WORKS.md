@@ -18,7 +18,7 @@ The twist that makes it different from ChatGPT or NotebookLM: **after every answ
 
 A **notebook** is a container — think of it like a Google Drive folder for a single subject (e.g. "DSA", "Operating Systems").
 
-Each notebook can hold **up to 5 sources**:
+Each notebook can hold **up to 10 sources**:
 - PDF documents (uploaded directly)
 - YouTube videos (paste the URL — the system fetches the transcript automatically)
 
