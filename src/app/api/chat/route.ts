@@ -39,6 +39,7 @@ import { db } from "@/db";
 import { topics } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getMasteryTier, scoreDelta, clipScore } from "@/lib/mastery";
+import { checkRateLimit } from "@/lib/rate-limit";
 import type { Correctness } from "@/types";
 
 export const maxDuration = 60;
@@ -205,6 +206,14 @@ export async function POST(req: Request) {
     session = await auth.api.getSession({ headers: await headers() });
     if (!session || session.user.banned) {
       return new Response("Unauthorised", { status: 401 });
+    }
+
+    const rateLimit = checkRateLimit(`chat:${session.user.id}`);
+    if (!rateLimit.allowed) {
+      return new Response("You're sending messages too quickly. Please wait a moment and try again.", {
+        status: 429,
+        headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+      });
     }
 
     body = (await req.json()) as ChatRequestBody;
