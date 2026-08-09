@@ -66,6 +66,8 @@ export function InteractionFilters() {
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="answer">Answer</SelectItem>
             <SelectItem value="progress">Progress</SelectItem>
+            <SelectItem value="advance">Advance</SelectItem>
+            <SelectItem value="mastery_complete">Mastery complete</SelectItem>
             <SelectItem value="reveal">Reveal</SelectItem>
           </SelectContent>
         </Select>

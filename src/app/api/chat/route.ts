@@ -412,6 +412,10 @@ export async function POST(req: Request) {
           retrievedContext: JSON.stringify(sourceItems),
           promptTemplate: promptTemplateUsed, response: text,
           latencyMs: Date.now() - requestStartedAt,
+          // This message asks no Quick check, so there's nothing to await a
+          // reply for — leave it "unscored" and it would sit forever as a
+          // false "pending reply" in admin analytics (see createInteraction).
+          ...(promptTemplateUsed === "mastery_complete" ? { correctness: "completed", scoreDelta: 0 } : {}),
         });
         await touchNotebook(notebookId, userId);
 

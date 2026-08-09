@@ -15,6 +15,12 @@ export async function createInteraction(data: {
   promptTemplate: string;
   response: string;
   latencyMs?: number;
+  // Omit both to fall back to the "unscored" DB default for interactions that
+  // end with a Quick check awaiting a reply. Pass them for interactions that
+  // don't ask anything (e.g. a mastery wrap-up) so they aren't miscounted as
+  // "pending reply" in admin analytics — see getStudentAnalytics().
+  correctness?: string;
+  scoreDelta?: number;
 }): Promise<Interaction> {
   const rows = await db.insert(interactions).values(data).returning();
   return rows[0];
