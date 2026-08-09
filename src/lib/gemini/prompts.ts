@@ -160,14 +160,7 @@ ${conversation ? `\nConversation so far:\n${conversation}\n` : ""}
 
 ${wasHint
   ? "The student is mostly there but slightly shaky. Anchor the concept from a fresh angle, then add a small extension. Use the same breakdown style: analogy → example → key term."
-  : `The student demonstrated understanding. Move them forward.
-
-COVERAGE CHECK (do this silently): Look at the conversation above and the course material.
-- Has the student now engaged with and correctly answered questions about the core ideas of "${topic}" as covered in the material — the definition, how it works, and why it matters?
-- ${masteryScore >= 45 ? `Yes (score ${masteryScore}/100 — they've answered multiple checks correctly):` : `Not yet (score ${masteryScore}/100 — too early to suggest moving on):`}
-  ${masteryScore >= 45
-    ? `If coverage looks complete, after your explanation naturally say something like: "You've built solid understanding of ${topic}. Based on your notes, a natural next step is [X] — want me to walk you through it?" Keep it one casual sentence. If coverage still has clear gaps, continue deepening this topic instead.`
-    : "Continue deepening this topic — don't suggest moving on yet."}`}
+  : `The student demonstrated understanding. Deepen their grasp of "${topic}" further — a new angle, a less obvious edge case, or a slightly harder application. Do not repeat ground already covered in the conversation above, and do not suggest moving to a different topic (that decision is made elsewhere).`}
 
 Write in this shape:
 1. ONE sentence confirming what they got right and why it matters (no "Great job!", no emojis).
@@ -191,9 +184,97 @@ Rules for the Quick check:
 - Only test what you introduced in this response
 - Choose a format that fits the tier: ${tier === "recall" ? '"In your own words, …" or "Give an example of …"' : tier === "application" ? '"How would you use … to …?" or "What would happen if …?"' : '"Why does … matter?" or "How does … differ from …?"'}
 - 8–15 words. No hints embedded.
-- If you suggested moving to a new concept, the Quick check should be about that new concept.
 
 No emojis. No "Great job!" or "Excellent!". No apologies.
+`;
+
+// ── Deciding what comes next, grounded in the material's own structure ─────
+
+export const NEXT_CONCEPT_TEMPLATE = (
+  topic: string,
+  notebookTitle: string,
+) => `\
+You are deciding what a student studying "${notebookTitle}" should learn next.
+The student has just demonstrated solid understanding of the concept "${topic}".
+
+Use file_search to look at how the course material is actually organised —
+chapters, sections, headings, the order topics are introduced — and find
+where "${topic}" sits in that structure.
+
+Decide whether there is a DIFFERENT topic, concept, or subtopic that appears
+later in the material's own structure that the student has not yet studied.
+If yes, name only the single most immediate next one — do not skip ahead
+several sections, and do not invent a topic that is not actually present in
+the material.
+
+Reply with ONLY this JSON object, no other text, no markdown fences:
+{"next_topic": "<topic name, 2-5 words, or null if you cannot find a further unstudied topic in the material>"}
+
+The topic name must come directly from the material's own structure. If you
+are not confident such a next topic exists in the material, use null — do not
+guess.
+`;
+
+// ── Advancing to the next concept after mastery is confirmed ───────────────
+
+export const ADVANCE_TEMPLATE = (
+  masteredTopic: string,
+  nextTopic: string,
+  conversation: string,
+  notebookTitle: string,
+  tier: "recall" | "application" | "analysis",
+) => `\
+You are a smart AI tutor for the notebook "${notebookTitle}".
+The student has just built solid understanding of "${masteredTopic}" and is
+moving on to "${nextTopic}", which comes next according to the material's own
+structure. Search the course materials and answer ONLY from what you find.
+Never invent facts.
+${conversation ? `\nConversation so far (for context — do NOT repeat what's already covered):\n${conversation}\n` : ""}
+Next topic: ${nextTopic} | Mastery tier: ${tier}
+
+━━━ YOUR TASK ━━━
+1. ONE short sentence bridging forward, e.g. "You've got a solid handle on
+   ${masteredTopic} — next up is ${nextTopic}." (adapt naturally, don't quote
+   this verbatim).
+2. Then explain ${nextTopic} using the same breakdown style as a great teacher:
+   OPENING — one plain sentence, zero jargon.
+   ANALOGY — "Think of it like this:" or "Imagine:" with a concrete parallel,
+     preferring software/computing examples over unrelated everyday objects.
+   STRUCTURE — real markdown "## " headings if multiple sub-concepts.
+   EXAMPLES — numbered steps for processes; name the concept at the end.
+   Short punchy sentences. No walls of text.
+
+Do NOT say "according to the source" or "the material states".
+
+━━━ QUICK CHECK ━━━
+After one blank line, write exactly:
+Quick check: [your question]
+
+Write the "Quick check:" line as plain text — no "##", no "**bold**", no
+leading punctuation.
+
+Rules for the Quick check:
+- ONLY test something you explained about ${nextTopic} above.
+- NEVER ask "What is X?" or "Define X".
+- Tier guidance: ${tier === "recall" ? "recall — confirm they grasped the core idea you just explained" : tier === "application" ? "application — ask them to use or apply what you just explained" : "analysis — ask them to compare, evaluate, or reason about what you just explained"}.
+- 8–15 words. No hints embedded.
+
+No emojis. No "Great job!" or "Excellent!". No apologies.
+`;
+
+// ── Wrap-up when no further unstudied topic exists in the material ─────────
+
+export const MASTERY_COMPLETE_TEMPLATE = (
+  topic: string,
+  notebookTitle: string,
+) => `\
+The student has just mastered "${topic}", the last unstudied topic found in
+the notebook "${notebookTitle}"'s materials.
+
+Write 2 to 3 short sentences congratulating them (no emojis, no "Great job!")
+and noting they've now covered everything in the current sources. Suggest
+they add another source if they want to keep going, or revisit an earlier
+topic to sharpen it further. Do NOT ask a Quick check question.
 `;
 
 // ── Give-up → reveal answer + new check ─────────────────────────────────────

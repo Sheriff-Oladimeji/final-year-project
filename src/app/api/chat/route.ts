@@ -14,6 +14,9 @@ import {
   CLASSIFY_TOPIC_TEMPLATE,
   DIRECT_ANSWER_TEMPLATE,
   AFTER_CORRECT_TEMPLATE,
+  NEXT_CONCEPT_TEMPLATE,
+  ADVANCE_TEMPLATE,
+  MASTERY_COMPLETE_TEMPLATE,
   REVEAL_TEMPLATE,
   CLASSIFY_CHECK_TEMPLATE,
   INTENT_CLASSIFIER_TEMPLATE,
@@ -39,6 +42,10 @@ import { getMasteryTier, scoreDelta, clipScore } from "@/lib/mastery";
 import type { Correctness } from "@/types";
 
 export const maxDuration = 60;
+
+// Score at which a correct answer triggers a check for whether the material
+// has a further, unstudied topic to advance to (see determineNextConcept).
+const MASTERY_ADVANCE_THRESHOLD = 45;
 
 type Intent = "new_question" | "answer_attempt" | "give_up" | "meta";
 
@@ -133,6 +140,45 @@ Quote the source text directly. If nothing relevant is found, output: []`,
     // fall through to fallback
   }
   return fallbackNames.map((name) => ({ name }));
+}
+
+/**
+ * After a topic is mastered, ask (grounded via file_search against the actual
+ * course material) whether there is a further, unstudied topic to advance to,
+ * and if so what it's called. Returns null when the model can't find one, or
+ * when it names the same topic the student just mastered — both treated as
+ * "nothing to advance to" so the caller falls back to deepening the current
+ * topic instead of looping.
+ */
+async function determineNextConcept(
+  topicName: string,
+  notebookTitle: string,
+  fileSearchStoreName: string,
+): Promise<string | null> {
+  try {
+    const { text } = await generateText({
+      model: geminiModel,
+      providerOptions: NO_THINKING,
+      tools: { file_search: google.tools.fileSearch({ fileSearchStoreNames: [fileSearchStoreName] }) },
+      prompt: NEXT_CONCEPT_TEMPLATE(topicName, notebookTitle),
+    });
+    const match = text.match(/\{[\s\S]*?\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]) as { next_topic?: string | null };
+      let nextTopic = parsed.next_topic?.trim();
+      if (nextTopic && nextTopic.length > 100) nextTopic = nextTopic.slice(0, 100);
+      if (
+        nextTopic &&
+        nextTopic.toLowerCase() !== "null" &&
+        nextTopic.toLowerCase() !== topicName.toLowerCase()
+      ) {
+        return nextTopic;
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return null;
 }
 
 function parseCorrectness(raw: string): Correctness {
@@ -296,35 +342,73 @@ export async function POST(req: Request) {
         ]);
 
         const isCorrect = correctness === "correct" || correctness === "correct_with_hint";
-        const prompt = isCorrect
-          ? AFTER_CORRECT_TEMPLATE(
-              interaction.question, userText, topic.name,
-              conversation, notebookTitle, newTier, newScore, correctness === "correct_with_hint",
+
+        // Once mastery clears the threshold, decide — deterministically, in
+        // code, grounded against the actual material — whether to advance to
+        // a new topic rather than leaving that decision to unenforced prose.
+        let nextTopicName: string | null = null;
+        if (isCorrect && newScore >= MASTERY_ADVANCE_THRESHOLD) {
+          nextTopicName = await determineNextConcept(topic.name, notebookTitle, fileSearchStoreName);
+        }
+        const advanceTopic = nextTopicName
+          ? await getOrCreateTopic(userId, notebookId, nextTopicName)
+          : null;
+
+        const prompt = advanceTopic
+          ? ADVANCE_TEMPLATE(
+              topic.name, advanceTopic.name, conversation, notebookTitle,
+              getMasteryTier(advanceTopic.masteryScore),
             )
-          : DIRECT_ANSWER_TEMPLATE(
-              interaction.question, topic.name, conversation, notebookTitle, newTier,
-            );
+          : !isCorrect
+            ? DIRECT_ANSWER_TEMPLATE(
+                interaction.question, topic.name, conversation, notebookTitle, newTier,
+              )
+            : newScore >= MASTERY_ADVANCE_THRESHOLD
+              ? MASTERY_COMPLETE_TEMPLATE(topic.name, notebookTitle)
+              : AFTER_CORRECT_TEMPLATE(
+                  interaction.question, userText, topic.name,
+                  conversation, notebookTitle, newTier, newScore, correctness === "correct_with_hint",
+                );
 
         const result = streamText({
           model: geminiModel,
           prompt,
           tools: fsTools,
         });
-        const retrievalPromise = retrieveSourceExcerpts(interaction.question, fileSearchStoreName, materialNames);
+        const retrievalPromise = retrieveSourceExcerpts(
+          advanceTopic ? advanceTopic.name : interaction.question,
+          fileSearchStoreName,
+          materialNames,
+        );
         writer.merge(result.toUIMessageStream({ sendSources: true }));
         const [text, sourceItems] = await Promise.all([result.text, retrievalPromise]);
 
+        const targetTopic = advanceTopic ?? topic;
+        const targetScore = advanceTopic ? advanceTopic.masteryScore : newScore;
+        const targetTier = advanceTopic ? getMasteryTier(advanceTopic.masteryScore) : newTier;
+        // Advancing starts a genuinely new conversation chain — a different
+        // `question` from the mastered topic's chain — so history replay and
+        // future intent classification key off the new topic, not the stale one.
+        const nextQuestion = advanceTopic ? `What's next after ${topic.name}?` : interaction.question;
+        const promptTemplateUsed = advanceTopic
+          ? "advance"
+          : !isCorrect
+            ? "answer"
+            : newScore >= MASTERY_ADVANCE_THRESHOLD
+              ? "mastery_complete"
+              : "progress";
+
         const next = await createInteraction({
-          userId, sessionId, notebookId, topicId: topic.id,
-          question: interaction.question,
+          userId, sessionId, notebookId, topicId: targetTopic.id,
+          question: nextQuestion,
           retrievedContext: JSON.stringify(sourceItems),
-          promptTemplate: isCorrect ? "progress" : "answer", response: text,
+          promptTemplate: promptTemplateUsed, response: text,
           latencyMs: Date.now() - requestStartedAt,
         });
         await touchNotebook(notebookId, userId);
 
         writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
-        writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
+        writer.write({ type: "data-topic", id: "topic", data: { name: targetTopic.name, mastery_score: targetScore, tier: targetTier } });
         writer.write({ type: "data-score", id: "score", data: { correctness, score_delta: delta, new_score: newScore, new_tier: newTier } });
         writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
