@@ -43,10 +43,6 @@ import type { Correctness } from "@/types";
 
 export const maxDuration = 60;
 
-// Score at which a correct answer triggers a check for whether the material
-// has a further, unstudied topic to advance to (see determineNextConcept).
-const MASTERY_ADVANCE_THRESHOLD = 45;
-
 type Intent = "new_question" | "answer_attempt" | "give_up" | "meta";
 
 interface ChatRequestBody {
@@ -343,11 +339,14 @@ export async function POST(req: Request) {
 
         const isCorrect = correctness === "correct" || correctness === "correct_with_hint";
 
-        // Once mastery clears the threshold, decide — deterministically, in
-        // code, grounded against the actual material — whether to advance to
-        // a new topic rather than leaving that decision to unenforced prose.
+        // A clean "correct" (no hint needed) means they can restate/use the
+        // idea unaided — that's the signal to advance, checked fresh each
+        // turn rather than gated behind an accumulated score. A hint-assisted
+        // answer gets one more reinforcement round on the same topic first
+        // (via AFTER_CORRECT_TEMPLATE's wasHint branch below) before it's
+        // eligible to advance on the next clean answer.
         let nextTopicName: string | null = null;
-        if (isCorrect && newScore >= MASTERY_ADVANCE_THRESHOLD) {
+        if (correctness === "correct") {
           nextTopicName = await determineNextConcept(topic.name, notebookTitle, fileSearchStoreName);
         }
         const advanceTopic = nextTopicName
@@ -363,7 +362,7 @@ export async function POST(req: Request) {
             ? DIRECT_ANSWER_TEMPLATE(
                 interaction.question, topic.name, conversation, notebookTitle, newTier,
               )
-            : newScore >= MASTERY_ADVANCE_THRESHOLD
+            : correctness === "correct"
               ? MASTERY_COMPLETE_TEMPLATE(topic.name, notebookTitle)
               : AFTER_CORRECT_TEMPLATE(
                   interaction.question, userText, topic.name,
@@ -394,7 +393,7 @@ export async function POST(req: Request) {
           ? "advance"
           : !isCorrect
             ? "answer"
-            : newScore >= MASTERY_ADVANCE_THRESHOLD
+            : correctness === "correct"
               ? "mastery_complete"
               : "progress";
 
