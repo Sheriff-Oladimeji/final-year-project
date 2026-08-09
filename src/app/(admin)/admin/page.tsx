@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Users, Ban, FileText, MessageSquare } from "lucide-react";
+import { Users, Ban, FileText, MessageSquare, BarChart3, ListFilter, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { countStudents, countBannedStudents } from "@/db/queries/users";
 import { countAllMaterials } from "@/db/queries/materials";
@@ -55,24 +55,43 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Link href="/admin/users" className="rounded-xl border border-border p-5 transition-colors hover:border-primary/40 hover:bg-muted/40">
-          <h2 className="text-sm font-medium">Manage students</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            View accounts, ban or re-enable access, or delete a student and all their data.
-          </p>
-        </Link>
-        <Link href="/admin/insights" className="rounded-xl border border-border p-5 transition-colors hover:border-primary/40 hover:bg-muted/40">
-          <h2 className="text-sm font-medium">Insights</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Session activity, correctness distribution, and response time per student.
-          </p>
-        </Link>
-        <Link href="/admin/interactions" className="rounded-xl border border-border p-5 transition-colors hover:border-primary/40 hover:bg-muted/40">
-          <h2 className="text-sm font-medium">Review interactions</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Filter the full ask-and-reply log across every student and topic.
-          </p>
-        </Link>
+        {[
+          {
+            href: "/admin/users",
+            icon: Users,
+            title: "Manage students",
+            description: "View accounts, ban or re-enable access, or delete a student and all their data.",
+          },
+          {
+            href: "/admin/insights",
+            icon: BarChart3,
+            title: "Insights",
+            description: "Session activity, correctness distribution, and response time per student.",
+          },
+          {
+            href: "/admin/interactions",
+            icon: ListFilter,
+            title: "Review interactions",
+            description: "Filter the full ask-and-reply log across every student and topic.",
+          },
+        ].map(({ href, icon: Icon, title, description }) => (
+          <Link
+            key={href}
+            href={href}
+            className="group/action flex cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between">
+              <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-muted transition-colors group-hover/action:border-primary/30 group-hover/action:bg-primary/10">
+                <Icon className="size-4 text-foreground transition-colors group-hover/action:text-primary" strokeWidth={1.75} />
+              </span>
+              <ArrowRight className="size-4 -translate-x-1 text-muted-foreground opacity-0 transition-all duration-200 group-hover/action:translate-x-0 group-hover/action:text-primary group-hover/action:opacity-100" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );
