@@ -22,7 +22,7 @@ interface PageProps {
 
 export default async function NotebookPage({ params }: PageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/");
+  if (!session) redirect("/login");
 
   const { id } = await params;
   const rawNotebook = await getNotebook(id, session.user.id);

@@ -15,7 +15,7 @@ import type { Notebook } from "@/types";
 
 export default async function DashboardPage() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/");
+  if (!session) redirect("/login");
 
   const rawNotebooks = await listNotebooks(session.user.id);
   const notebooks: Notebook[] = rawNotebooks.map((n) => ({

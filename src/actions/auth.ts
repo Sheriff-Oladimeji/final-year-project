@@ -7,7 +7,7 @@ import { adminAuth } from "@/lib/admin-auth";
 
 export async function logoutAction() {
   await auth.api.signOut({ headers: await headers() });
-  redirect("/");
+  redirect("/login");
 }
 
 export async function adminLogoutAction() {
