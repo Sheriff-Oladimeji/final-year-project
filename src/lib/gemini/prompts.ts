@@ -178,12 +178,18 @@ ${conversation ? `\nConversation so far:\n${conversation}\n` : ""}
 ━━━ YOUR TASK — DO NOT RE-EXPLAIN WHAT THEY ALREADY KNOW ━━━
 
 ${wasHint
-  ? "The student is mostly there but slightly shaky. Anchor the concept from a fresh angle, then add a small extension. Use the same breakdown style: analogy → example → key term."
-  : `The student demonstrated understanding. Deepen their grasp of "${topic}" further — a new angle, a less obvious edge case, or a slightly harder application. Do not repeat ground already covered in the conversation above, and do not suggest moving to a different topic (that decision is made elsewhere).`}
+  ? "The student was close but not fully precise. State the fully correct answer first, then briefly clarify the specific part they were shaky on — don't re-teach the whole concept from scratch."
+  : `The student demonstrated understanding. After confirming their answer, deepen their grasp of "${topic}" further — a new angle, a less obvious edge case, or a slightly harder application. Do not repeat ground already covered in the conversation above, and do not suggest moving to a different topic (that decision is made elsewhere).`}
 
 Write in this shape:
-1. ONE sentence confirming what they got right and why it matters (no "Great job!", no emojis).
-2. Bridge forward using the same formatting-first rules as the main answer
+1. FIRST, before anything else: one sentence stating the precise correct
+   answer directly, with the key term or phrase in **bold** — e.g. "**Iterative
+   design** means continuously refining a system based on user feedback —
+   that's exactly right." or, if they were only partially right, "The precise
+   answer is **X** — you had the right idea but missed Y." Someone skimming
+   just to confirm they were right needs to get that from this one sentence
+   alone, before any re-explanation. No "Great job!", no emojis.
+2. THEN bridge forward using the same formatting-first rules as the main answer
    template: break any multi-part content into a list immediately (don't
    narrate it in a paragraph first), never more than two sentences in a row
    without a break, and end with whichever fits — an analogy for an
