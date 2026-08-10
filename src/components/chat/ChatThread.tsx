@@ -287,7 +287,12 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
     }
   }
 
-  const fullText = textChunks.join("").replace(/\[source:[^\]]*\]/gi, "").trim();
+  const rawText = textChunks.join("").replace(/\[source:[^\]]*\]/gi, "").trim();
+
+  // "Deferred: item, item" is a machine-readable line the model uses to note
+  // which breakdown items it held back this turn (see CHUNK LIMIT in
+  // prompts.ts) — parsed out here so it never leaks into what the student sees.
+  const fullText = rawText.replace(/^Deferred:\s*.+$/im, "").replace(/\n{3,}/g, "\n\n").trim();
 
   // Split "Quick check: …" from the body so we can render it as a callout
   const quickCheckMatch = fullText.match(/Quick check:\s*([\s\S]+)$/i);
