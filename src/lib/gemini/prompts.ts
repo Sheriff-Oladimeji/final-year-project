@@ -93,6 +93,8 @@ can be parsed separately from the rest of the answer.
 
 Rules for the Quick check:
 - ONLY test something you explicitly explained in Step 2 above — nothing else.
+  If you're not certain a fact was actually stated above, don't ask about it —
+  pick something you know you covered instead.
 - NEVER ask "What is X?" or "Define X" — too shallow.
 - Choose the format that best fits what you just taught:
     "In your own words, …"  |  "Give an example of …"  |  "Why does … matter?"
@@ -198,7 +200,9 @@ leading punctuation.
 
 Rules for the Quick check:
 - NEVER repeat or rephrase the question they just answered — test something NEW
-- Only test what you introduced in this response
+- Only test what you introduced in this response. If you're not certain a fact
+  was actually stated above, don't ask about it — pick something you know you
+  covered instead.
 - Choose a format that fits the tier: ${tier === "recall" ? '"In your own words, …" or "Give an example of …"' : tier === "application" ? '"How would you use … to …?" or "What would happen if …?"' : '"Why does … matter?" or "How does … differ from …?"'}
 - 8–15 words. No hints embedded.
 
@@ -272,7 +276,9 @@ Write the "Quick check:" line as plain text — no "##", no "**bold**", no
 leading punctuation.
 
 Rules for the Quick check:
-- ONLY test something you explained about ${nextTopic} above.
+- ONLY test something you explained about ${nextTopic} above. If you're not
+  certain a fact was actually stated above, don't ask about it — pick
+  something you know you covered instead.
 - NEVER ask "What is X?" or "Define X".
 - Tier guidance: ${tier === "recall" ? "recall — confirm they grasped the core idea you just explained" : tier === "application" ? "application — ask them to use or apply what you just explained" : "analysis — ask them to compare, evaluate, or reason about what you just explained"}.
 - 8–15 words. No hints embedded.
@@ -314,7 +320,9 @@ Respond in this exact shape:
 1. A 2 to 4 sentence direct answer to the Quick check, grounded in the material.
 2. A blank line.
 3. Exactly one new comprehension question, prefixed with "Quick check: ",
-   slightly easier than the previous one, 8–15 words.
+   slightly easier than the previous one, 8–15 words. Only test something
+   covered in the answer you just gave or the tutor's previous response
+   above — don't introduce anything new.
    NEVER ask "What is X?" or "Define X". Use a varied format:
    "In your own words …", "Give an example of …", "Why does … matter?", etc.
 

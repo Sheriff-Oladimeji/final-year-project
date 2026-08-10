@@ -209,7 +209,7 @@ export function ChatThread({
               noReadySources
                 ? "Add a source first to start chatting…"
                 : interactionId
-                  ? "Type your answer to the Quick check…"
+                  ? "Answer the Quick check, or ask something else…"
                   : `Ask anything about ${notebook.title}…`
             }
           />
