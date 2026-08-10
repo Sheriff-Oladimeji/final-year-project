@@ -93,11 +93,18 @@ can be parsed separately from the rest of the answer.
 
 Rules for the Quick check:
 - ONLY test something you explicitly explained in Step 2 above — nothing else.
-  If you're not certain a fact was actually stated above, don't ask about it —
-  pick something you know you covered instead.
+  The bar is NOT "do I know this" — it's "did I just teach this, in words,
+  above." Naming or listing something is not the same as explaining it: if
+  Step 2 only listed items (e.g. "time, cost, scope, quality") without
+  explaining the reasoning behind them, do not ask why they matter — you
+  never taught that reasoning, even if you personally could explain it.
+  Test something you actually walked through instead.
 - NEVER ask "What is X?" or "Define X" — too shallow.
-- Choose the format that best fits what you just taught:
-    "In your own words, …"  |  "Give an example of …"  |  "Why does … matter?"
+- Choose the format that best fits what you just taught — but the format
+  must match content you actually explained, not just named or listed:
+    "In your own words, …" — only for something you explained, not just listed
+    "Give an example of …" — only if you gave or clearly implied an example
+    "Why does … matter?" — only if you explained the reasoning, not just the term
     "What would happen if …?"  |  "How does … differ from …?"  |  "How would you apply … to …?"
 - Tier guidance: ${tier === "recall" ? "recall — confirm they grasped the core idea you just explained" : tier === "application" ? "application — ask them to use or apply what you just explained" : "analysis — ask them to compare, evaluate, or reason about what you just explained"}.
 - 8–15 words. No hints embedded in the question.
@@ -206,10 +213,14 @@ leading punctuation.
 
 Rules for the Quick check:
 - NEVER repeat or rephrase the question they just answered — test something NEW
-- Only test what you introduced in this response. If you're not certain a fact
-  was actually stated above, don't ask about it — pick something you know you
-  covered instead.
-- Choose a format that fits the tier: ${tier === "recall" ? '"In your own words, …" or "Give an example of …"' : tier === "application" ? '"How would you use … to …?" or "What would happen if …?"' : '"Why does … matter?" or "How does … differ from …?"'}
+- Only test what you introduced in this response. The bar is NOT "do I know
+  this" — it's "did I just teach this, in words, above." Naming or listing
+  something isn't explaining it: if you only listed items without explaining
+  the reasoning behind them, don't ask why they matter — you never taught
+  that reasoning, even if you personally could explain it.
+- Choose a format that fits the tier, but only if you actually taught content
+  that format fits (e.g. don't ask "why does X matter" unless you explained
+  the reasoning, not just named X): ${tier === "recall" ? '"In your own words, …" or "Give an example of …"' : tier === "application" ? '"How would you use … to …?" or "What would happen if …?"' : '"Why does … matter?" or "How does … differ from …?"'}
 - 8–15 words. No hints embedded.
 
 No emojis. No "Great job!" or "Excellent!". No apologies.
@@ -282,9 +293,11 @@ Write the "Quick check:" line as plain text — no "##", no "**bold**", no
 leading punctuation.
 
 Rules for the Quick check:
-- ONLY test something you explained about ${nextTopic} above. If you're not
-  certain a fact was actually stated above, don't ask about it — pick
-  something you know you covered instead.
+- ONLY test something you explained about ${nextTopic} above. The bar is NOT
+  "do I know this" — it's "did I just teach this, in words, above." Naming or
+  listing something isn't explaining it: if you only listed items without
+  explaining the reasoning behind them, don't ask why they matter — you never
+  taught that reasoning, even if you personally could explain it.
 - NEVER ask "What is X?" or "Define X".
 - Tier guidance: ${tier === "recall" ? "recall — confirm they grasped the core idea you just explained" : tier === "application" ? "application — ask them to use or apply what you just explained" : "analysis — ask them to compare, evaluate, or reason about what you just explained"}.
 - 8–15 words. No hints embedded.

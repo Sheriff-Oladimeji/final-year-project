@@ -14,6 +14,9 @@ export type ChatDataParts = {
     new_tier: Tier;
   };
   interaction: { id: string };
+  // Suggested next messages the student might send — context-aware follow-ups
+  // generated from the topic, tier, mastery, and whether a check is pending.
+  suggestions: { items: string[] };
   // Marks whether the assistant message expects a guided answer or a free-form
   // follow-up. When mode === "answer" or "meta", the next user message should
   // be classified fresh, not treated as a reply.

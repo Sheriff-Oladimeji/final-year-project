@@ -77,6 +77,7 @@ export function ChatThread({
 }: ChatThreadProps) {
   const [text, setText] = useState("");
   const [interactionId, setInteractionId] = useState<string | null>(initialInteractionId);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   const readyCount = materials.filter((m) => m.status === "ready").length;
   const noReadySources = readyCount === 0;
@@ -92,6 +93,8 @@ export function ChatThread({
         if (mode === "answer" || mode === "meta") {
           setInteractionId(null);
         }
+      } else if (type === "data-suggestions") {
+        setSuggestions((data as { items: string[] }).items);
       }
     },
   });
@@ -123,6 +126,7 @@ export function ChatThread({
   function send(userText: string) {
     const trimmed = userText.trim();
     if (!trimmed || noReadySources) return;
+    setSuggestions([]);
     sendMessage(
       { text: trimmed },
       { body: { notebookId: notebook.id, interactionId: interactionId ?? undefined } },
@@ -197,6 +201,21 @@ export function ChatThread({
             Couldn&apos;t process that. Please try again.
           </AlertDescription>
         </Alert>
+      )}
+
+      {suggestions.length > 0 && status === "ready" && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => send(s)}
+              className="rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       )}
 
       <PromptInput onSubmit={handleSubmit}>
