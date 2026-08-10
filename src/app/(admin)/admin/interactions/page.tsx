@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { InteractionFilters } from "@/components/admin/InteractionFilters";
 import { InteractionRow } from "@/components/admin/InteractionRow";
+import { ExportInteractionsButton } from "@/components/admin/ExportInteractionsButton";
 
 interface PageProps {
   searchParams: Promise<{
@@ -40,11 +41,14 @@ export default async function AdminInteractionsPage({ searchParams }: PageProps)
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Interactions</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {params.user_id ? "Full interaction log for this student" : "Full interaction log across all students"}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">Interactions</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {params.user_id ? "Full interaction log for this student" : "Full interaction log across all students"}
+          </p>
+        </div>
+        <ExportInteractionsButton interactions={interactions} />
       </div>
 
       <Suspense>
