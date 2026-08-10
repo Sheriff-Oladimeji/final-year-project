@@ -195,13 +195,19 @@ Student's new message:
 
 Possible intents:
 - new_question: a fresh question about the course material, not directly answering
-  the previous Quick check
+  the previous Quick check. This includes requests to be taught or tested
+  more generally — "quiz me", "test me", "ask me a question", "give me
+  something to answer" are new_question, NOT meta: the student wants course
+  content, not an explanation of the app.
 - answer_attempt: the student is genuinely trying to answer the previous Quick
   check, even briefly or imperfectly
 - give_up: the student is signalling they don't know, want to skip, or want the
   answer revealed. Examples: "i don't know", "idk", "no idea", "just tell me",
   "show me the answer", "skip", "i give up", "pass", "no clue"
-- meta: the student is asking about how this app or learning system works
+- meta: the student is asking HOW the app/system itself works or behaves —
+  "how does scoring work", "what do the tiers mean", "how do I add a
+  source". Never use meta for a request to be taught or quizzed, even if it
+  mentions words like "quiz" or "test" — those are new_question.
 
 Reply with ONLY the label. No explanation, no punctuation.
 `;
@@ -387,20 +393,32 @@ No emojis. No apologies. Plain prose only.
 // ── Meta ────────────────────────────────────────────────────────────────────
 
 export const META_TEMPLATE = (userText: string) => `\
-You are the LearnAI tutor. The student asked something about how the system
+You are the LearnAI tutor. The student asked something about how the app
 itself works (not about their notebook content).
 
 Their message: ${userText}
 
-Briefly explain in 1 to 3 sentences. Cover only what's true:
-- This is a NotebookLM-style tutor. Each notebook holds up to 10 sources.
-- You answer their questions grounded in those sources, then ask a Quick check.
-- Their replies to the Quick check score per-topic mastery: +10 correct,
-  +5 partially correct, -10 incorrect, -5 give-up.
-- Three tiers display only: recall (0-30), application (31-60), analysis (61-100).
+Answer ONLY what they actually asked, in your own natural words — 1 to 3
+short sentences, like a person explaining, not a spec sheet. Don't recite
+every fact below regardless of what was asked; pick only what's relevant.
+
+Background you can draw from (true, but don't dump all of it every time):
+- Each notebook holds up to 10 sources (PDF, DOCX, TXT, Markdown, or a
+  YouTube link).
+- Answers are grounded in those sources, then followed by a Quick check.
+- A Quick check reply moves that topic's mastery score up or down, tracked
+  across three tiers: recall, application, analysis.
 - History is saved per notebook.
 
-End with a friendly nudge to ask about their sources. No emojis.
+If they specifically ask how scoring is calculated, the exact numbers are
+fine to share (they're already shown in the app's sidebar): +10 correct,
++5 partially correct, -10 incorrect, -5 give-up. Don't volunteer these
+numbers unasked, and never compare this app to a named competitor product
+— describe scoring qualitatively (moves up for a solid answer, down for a
+wrong one or a skip) unless the exact numbers are what was actually asked.
+
+End with a short, natural nudge to ask about their sources or keep
+studying. No emojis.
 `;
 
 // ── Per-turn follow-up suggestions ──────────────────────────────────────────
