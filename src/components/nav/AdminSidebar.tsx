@@ -35,7 +35,7 @@ export function AdminSidebar({ userEmail }: AdminSidebarProps) {
   const initial = userEmail.charAt(0).toUpperCase();
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-border bg-card sticky top-0">
+    <aside className="flex h-dvh w-56 shrink-0 flex-col border-r border-border bg-card sticky top-0">
       {/* Brand */}
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
         <div className="flex size-7 items-center justify-center rounded-lg bg-primary">

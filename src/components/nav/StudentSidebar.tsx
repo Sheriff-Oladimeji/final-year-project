@@ -64,7 +64,7 @@ export function StudentSidebar({ userEmail }: StudentSidebarProps) {
 
       <aside
         className={cn(
-          "flex h-screen w-64 flex-col border-r border-border bg-card",
+          "flex h-dvh w-64 flex-col border-r border-border bg-card",
           // Mobile: fixed slide-in drawer
           "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:w-72 max-lg:max-w-[85vw] max-lg:shadow-2xl max-lg:transition-transform max-lg:duration-200",
           open ? "max-lg:translate-x-0" : "max-lg:-translate-x-full",
