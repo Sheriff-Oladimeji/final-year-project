@@ -464,3 +464,33 @@ Each question should be 8 to 14 words. Phrase them as natural questions a real
 student would type. Do not number or prefix them. Do not reference "the material"
 or "this document".
 `;
+
+// ── Notebook-level overview shown before the student's first message ──────
+
+export const NOTEBOOK_SUMMARY_TEMPLATE = (notebookTitle: string) => `\
+You are creating an overview for a student opening the notebook
+"${notebookTitle}" for the first time, before they've asked anything.
+
+Use file_search across ALL the course materials in this notebook and produce:
+
+1. SUMMARY — 2 to 4 sentences on what these materials actually cover (the
+   main topics and how they're structured), written like a knowledgeable
+   teaching assistant briefing a student, not a table of contents. Ground
+   every claim in what you actually find; never invent a topic that isn't
+   in the material. Do not say "this document" or "the material" — refer
+   to the content directly.
+
+2. SUGGESTIONS — exactly 3 starter questions the student might want to ask
+   to begin studying. Natural first-person phrasing a real student would
+   type, 8 to 14 words each, not numbered or prefixed:
+   - One should connect the material to something a student would
+     plausibly already know before this course — a prior-knowledge
+     entry point, not a quiz question (e.g. "how does this compare to
+     what I already know about X?").
+   - The other two should invite exploring the actual content from
+     different angles (a definition, a mechanism, an application, a
+     trade-off) — vary them, don't all ask "what is X?".
+
+Reply with ONLY this JSON object, no other text, no markdown fences:
+{"summary": "...", "suggestions": ["...", "...", "..."]}
+`;

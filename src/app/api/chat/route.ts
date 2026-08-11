@@ -337,11 +337,6 @@ export async function POST(req: Request) {
         writer.merge(result.toUIMessageStream({ sendSources: true }));
         const [text, sourceItems] = await Promise.all([result.text, retrievalPromise]);
 
-        // Suggestions need the final text, so they can only start once it
-        // resolves — fired here, not awaited until after the DB writes below,
-        // so the two run concurrently instead of stacking latency.
-        const suggestionsPromise = generateFollowupSuggestions(topic.name, newTier, text, newScore);
-
         const next = await createInteraction({
           userId, sessionId, notebookId, topicId: topic.id,
           question: interaction.question,
@@ -350,14 +345,12 @@ export async function POST(req: Request) {
           latencyMs: Date.now() - requestStartedAt,
         });
         await touchNotebook(notebookId, userId);
-        const suggestions = await suggestionsPromise;
 
         writer.write({ type: "data-mode", id: "mode", data: { value: "answer" } });
         writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
         writer.write({ type: "data-score", id: "score", data: { correctness: "give_up", score_delta: scoreDelta("give_up"), new_score: newScore, new_tier: newTier } });
         writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
-        writer.write({ type: "data-suggestions", id: "suggestions", data: { items: suggestions } });
         return;
       }
 
@@ -443,8 +436,6 @@ export async function POST(req: Request) {
               ? "mastery_complete"
               : "progress";
 
-        const suggestionsPromise = generateFollowupSuggestions(targetTopic.name, targetTier, text, targetScore);
-
         const next = await createInteraction({
           userId, sessionId, notebookId, topicId: targetTopic.id,
           question: nextQuestion,
@@ -457,14 +448,12 @@ export async function POST(req: Request) {
           ...(promptTemplateUsed === "mastery_complete" ? { correctness: "completed", scoreDelta: 0 } : {}),
         });
         await touchNotebook(notebookId, userId);
-        const suggestions = await suggestionsPromise;
 
         writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
         writer.write({ type: "data-topic", id: "topic", data: { name: targetTopic.name, mastery_score: targetScore, tier: targetTier } });
         writer.write({ type: "data-score", id: "score", data: { correctness, score_delta: delta, new_score: newScore, new_tier: newTier } });
         writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
-        writer.write({ type: "data-suggestions", id: "suggestions", data: { items: suggestions } });
         return;
       }
 
@@ -492,8 +481,6 @@ export async function POST(req: Request) {
       writer.merge(result.toUIMessageStream({ sendSources: true }));
       const [text, sourceItems] = await Promise.all([result.text, retrievalPromise]);
 
-      const suggestionsPromise = generateFollowupSuggestions(topicLabel, tier, text, topic.masteryScore);
-
       const interaction = await createInteraction({
         userId, sessionId, notebookId, topicId: topic.id,
         question: userText,
@@ -502,13 +489,11 @@ export async function POST(req: Request) {
         latencyMs: Date.now() - requestStartedAt,
       });
       await touchNotebook(notebookId, userId);
-      const suggestions = await suggestionsPromise;
 
       writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
       writer.write({ type: "data-topic", id: "topic", data: { name: topicLabel, mastery_score: topic.masteryScore, tier } });
       writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
       writer.write({ type: "data-interaction", id: "interaction", data: { id: interaction.id } });
-      writer.write({ type: "data-suggestions", id: "suggestions", data: { items: suggestions } });
     },
     onError: (error) => {
       console.error("[/api/chat] error", error);

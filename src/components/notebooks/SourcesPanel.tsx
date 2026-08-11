@@ -73,6 +73,7 @@ export function SourcesPanel({ notebookId, materials, cap, mobileOpen = false, o
         notebookId={notebookId}
         disabled={atCap}
         disabledReason={atCap ? `Limit of ${cap} sources reached` : undefined}
+        remainingSlots={cap - count}
       />
       {atCap && (
         <p className="text-xs text-muted-foreground">

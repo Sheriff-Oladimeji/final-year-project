@@ -134,6 +134,11 @@ export const notebooks = pgTable(
     userId:              text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     title:               varchar("title", { length: 255 }).notNull(),
     fileSearchStoreName: text("file_search_store_name"),
+    // NotebookLM-style overview generated once at least one source is ready,
+    // regenerated whenever a source is added — shown in the chat empty state
+    // before the student's first message. Null until generation completes.
+    summary:             text("summary"),
+    starterSuggestions:  text("starter_suggestions").array().notNull().default(sql`ARRAY[]::text[]`),
     createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:           timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

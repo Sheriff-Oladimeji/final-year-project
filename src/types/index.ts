@@ -17,6 +17,8 @@ export interface Notebook {
   id: string;
   user_id: string;
   title: string;
+  summary: string | null;
+  starter_suggestions: string[];
   created_at: string;
   updated_at: string;
 }

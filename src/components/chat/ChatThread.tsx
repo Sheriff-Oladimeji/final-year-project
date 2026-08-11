@@ -77,7 +77,6 @@ export function ChatThread({
 }: ChatThreadProps) {
   const [text, setText] = useState("");
   const [interactionId, setInteractionId] = useState<string | null>(initialInteractionId);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   const readyCount = materials.filter((m) => m.status === "ready").length;
   const noReadySources = readyCount === 0;
@@ -93,8 +92,6 @@ export function ChatThread({
         if (mode === "answer" || mode === "meta") {
           setInteractionId(null);
         }
-      } else if (type === "data-suggestions") {
-        setSuggestions((data as { items: string[] }).items);
       }
     },
   });
@@ -126,7 +123,6 @@ export function ChatThread({
   function send(userText: string) {
     const trimmed = userText.trim();
     if (!trimmed || noReadySources) return;
-    setSuggestions([]);
     sendMessage(
       { text: trimmed },
       { body: { notebookId: notebook.id, interactionId: interactionId ?? undefined } },
@@ -163,7 +159,40 @@ export function ChatThread({
                   ? "Upload at least one PDF or YouTube video on the left, then ask away."
                   : "The tutor answers from your sources, then asks a Quick check to track mastery."
               }
-            />
+            >
+              {!noReadySources && notebook.summary ? (
+                <div className="w-full max-w-xl space-y-4 text-left">
+                  <div className="flex items-center gap-1.5 text-primary">
+                    <Sparkles className="size-3.5" />
+                    <span className="text-xs font-medium tracking-wide uppercase">
+                      Notebook summary
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-foreground">
+                    {notebook.summary}
+                  </p>
+                  {notebook.starter_suggestions.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Try asking:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {notebook.starter_suggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => send(s)}
+                            className="rounded-full border border-border bg-muted/50 px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : undefined}
+            </ConversationEmptyState>
           )}
 
           {messages.map((message) => (
@@ -201,21 +230,6 @@ export function ChatThread({
             Couldn&apos;t process that. Please try again.
           </AlertDescription>
         </Alert>
-      )}
-
-      {suggestions.length > 0 && status === "ready" && (
-        <div className="flex flex-wrap gap-2 mb-2">
-          {suggestions.map((s, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => send(s)}
-              className="rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
       )}
 
       <PromptInput onSubmit={handleSubmit}>

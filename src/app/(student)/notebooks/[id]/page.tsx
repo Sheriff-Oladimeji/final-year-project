@@ -32,6 +32,8 @@ export default async function NotebookPage({ params }: PageProps) {
     id: rawNotebook.id,
     user_id: rawNotebook.userId,
     title: rawNotebook.title,
+    summary: rawNotebook.summary,
+    starter_suggestions: rawNotebook.starterSuggestions ?? [],
     created_at: rawNotebook.createdAt.toISOString(),
     updated_at: rawNotebook.updatedAt.toISOString(),
   };

@@ -47,6 +47,20 @@ export async function renameNotebook(
   return rows[0] ?? null;
 }
 
+export async function setNotebookSummary(
+  id: string,
+  userId: string,
+  summary: string,
+  suggestions: string[],
+): Promise<Notebook | null> {
+  const rows = await db
+    .update(notebooks)
+    .set({ summary, starterSuggestions: suggestions, updatedAt: new Date() })
+    .where(and(eq(notebooks.id, id), eq(notebooks.userId, userId)))
+    .returning();
+  return rows[0] ?? null;
+}
+
 export async function touchNotebook(id: string, userId: string): Promise<void> {
   await db
     .update(notebooks)

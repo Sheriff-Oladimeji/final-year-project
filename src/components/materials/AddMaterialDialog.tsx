@@ -27,6 +27,9 @@ interface AddMaterialDialogProps {
   trigger?: React.ReactNode;
   disabled?: boolean;
   disabledReason?: string;
+  // How many more sources this notebook can accept (cap - current count).
+  // Undefined means "unknown" — batches are only truncated when this is set.
+  remainingSlots?: number;
 }
 
 export function AddMaterialDialog({
@@ -34,10 +37,12 @@ export function AddMaterialDialog({
   trigger,
   disabled,
   disabledReason,
+  remainingSlots,
 }: AddMaterialDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [submittingVideo, setSubmittingVideo] = useState(false);
@@ -48,6 +53,7 @@ export function AddMaterialDialog({
     setFileError(null);
     setYoutubeError(null);
     setYoutubeUrl("");
+    setUploadProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -60,34 +66,76 @@ export function AddMaterialDialog({
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selected = Array.from(e.target.files ?? []);
+    if (selected.length === 0) return;
     setFileError(null);
 
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setFileError("That file is larger than 4 MB. Please choose a smaller file.");
+    // Validate every file's size up front, before any upload starts — never
+    // begin uploading a file we already know will be rejected.
+    const tooLarge = selected.filter((f) => f.size > MAX_UPLOAD_BYTES);
+    let toUpload = selected.filter((f) => f.size <= MAX_UPLOAD_BYTES);
+
+    let skippedForCap = 0;
+    if (remainingSlots !== undefined && toUpload.length > remainingSlots) {
+      skippedForCap = toUpload.length - Math.max(remainingSlots, 0);
+      toUpload = toUpload.slice(0, Math.max(remainingSlots, 0));
+    }
+
+    const notices: string[] = [];
+    if (tooLarge.length > 0) {
+      notices.push(
+        `Skipped (over 4 MB): ${tooLarge.map((f) => f.name).join(", ")}`,
+      );
+    }
+    if (skippedForCap > 0) {
+      notices.push(
+        `Skipped ${skippedForCap} file${skippedForCap > 1 ? "s" : ""} — not enough room left in this notebook.`,
+      );
+    }
+
+    if (toUpload.length === 0) {
+      setFileError(notices.join(" ") || "No valid files to upload.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
     setUploadingFile(true);
+    const failed: string[] = [];
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("notebookId", notebookId);
-      const result = await uploadMaterialAction(formData);
-      if ("error" in result) {
-        setFileError(result.error ?? "Upload failed.");
-      } else {
-        // Close immediately — sidebar will show Indexing while Gemini processes
-        setOpen(false);
-        reset();
-        router.refresh();
+      for (let i = 0; i < toUpload.length; i++) {
+        setUploadProgress({ done: i, total: toUpload.length });
+        const file = toUpload[i];
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("notebookId", notebookId);
+          const result = await uploadMaterialAction(formData);
+          if ("error" in result) {
+            failed.push(`${file.name}: ${result.error ?? "upload failed"}`);
+            // A cap error means every remaining file will fail the same way.
+            if (result.error?.toLowerCase().includes("limit")) break;
+          }
+        } catch {
+          failed.push(`${file.name}: upload failed`);
+        }
       }
-    } catch {
-      setFileError("Upload failed. Please try again.");
+
+      const allNotices = [...notices, ...failed].join(" ");
+      if (allNotices) {
+        setFileError(allNotices);
+      }
+      if (failed.length < toUpload.length) {
+        // At least one file succeeded — reflect it, but keep the dialog open
+        // if there's something the student should read first.
+        router.refresh();
+        if (!allNotices) {
+          setOpen(false);
+          reset();
+        }
+      }
     } finally {
       setUploadingFile(false);
+      setUploadProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -153,7 +201,7 @@ export function AddMaterialDialog({
 
           <TabsContent value="document" className="space-y-3 mt-4">
             <p className="text-xs text-muted-foreground">
-              Max 4 MB. PDF, DOCX, TXT, or Markdown.
+              Max 4 MB each. PDF, DOCX, TXT, or Markdown — select multiple files at once.
             </p>
             {fileError && (
               <Alert variant="destructive">
@@ -163,6 +211,7 @@ export function AddMaterialDialog({
             <input
               ref={fileInputRef}
               type="file"
+              multiple
               accept={MATERIAL_UPLOAD_ACCEPT}
               className="hidden"
               onChange={handleFileUpload}
@@ -177,12 +226,16 @@ export function AddMaterialDialog({
               {uploadingFile ? (
                 <>
                   <Loader2 className="size-5 animate-spin" />
-                  <span>Uploading…</span>
+                  <span>
+                    {uploadProgress
+                      ? `Uploading ${Math.min(uploadProgress.done + 1, uploadProgress.total)} of ${uploadProgress.total}…`
+                      : "Uploading…"}
+                  </span>
                 </>
               ) : (
                 <>
                   <FilePlus2 className="size-5" />
-                  <span>Click to choose file</span>
+                  <span>Click to choose files</span>
                 </>
               )}
             </button>

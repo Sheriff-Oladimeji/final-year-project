@@ -71,6 +71,13 @@
       "when": 1785212037240,
       "tag": "0009_left_stark_industries",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786438609174,
+      "tag": "0010_fine_the_twelve",
+      "breakpoints": true
     }
   ]
 }

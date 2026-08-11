@@ -14,10 +14,10 @@ import {
   listMaterialsByNotebook,
   MATERIALS_PER_NOTEBOOK_CAP,
 } from "@/db/queries/materials";
-import { getNotebook, touchNotebook } from "@/db/queries/notebooks";
+import { getNotebook, touchNotebook, setNotebookSummary } from "@/db/queries/notebooks";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadDocumentToStore, deleteDocumentFromStore } from "@/lib/gemini/fileSearch";
-import { generateMaterialSuggestions } from "@/lib/ai/suggestions";
+import { generateMaterialSuggestions, generateNotebookSummary } from "@/lib/ai/suggestions";
 import { detectMaterialKind, mimeTypeForKind } from "@/lib/materials";
 
 async function requireUser() {
@@ -47,6 +47,17 @@ async function persistSuggestions(materialId: string, userId: string) {
   const suggestions = await generateMaterialSuggestions(material);
   if (suggestions.length > 0) {
     await setMaterialSuggestions(materialId, suggestions);
+  }
+}
+
+// Re-runs on every source add so the overview stays in sync with what's
+// actually in the notebook by the time the student starts chatting.
+async function regenerateNotebookSummary(notebookId: string, userId: string) {
+  const nb = await getNotebook(notebookId, userId);
+  if (!nb) return;
+  const result = await generateNotebookSummary(notebookId, nb.title);
+  if (result) {
+    await setNotebookSummary(notebookId, userId, result.summary, result.suggestions);
   }
 }
 
@@ -98,6 +109,7 @@ export async function uploadMaterialAction(formData: FormData) {
       await setMaterialStatus(materialId, "ready", { fileSearchId: documentName, indexedAt: new Date() });
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
+      await regenerateNotebookSummary(notebookId, userId);
     } catch (err) {
       console.error("[uploadMaterialAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");
@@ -157,6 +169,7 @@ export async function submitYoutubeAction(formData: FormData) {
       await setMaterialStatus(materialId, "ready", { fileSearchId: documentName, indexedAt: new Date() });
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
+      await regenerateNotebookSummary(notebookId, userId);
     } catch (err) {
       console.error("[submitYoutubeAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");
