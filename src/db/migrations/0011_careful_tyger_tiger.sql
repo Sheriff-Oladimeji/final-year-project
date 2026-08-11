@@ -1,0 +1,1 @@
+ALTER TABLE "notebooks" ADD COLUMN "summary_generating" boolean DEFAULT false NOT NULL;

@@ -14,7 +14,7 @@ import {
   listMaterialsByNotebook,
   MATERIALS_PER_NOTEBOOK_CAP,
 } from "@/db/queries/materials";
-import { getNotebook, touchNotebook, setNotebookSummary } from "@/db/queries/notebooks";
+import { getNotebook, touchNotebook, setNotebookSummary, claimNotebookSummarySlot } from "@/db/queries/notebooks";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadDocumentToStore, deleteDocumentFromStore } from "@/lib/gemini/fileSearch";
 import { generateMaterialSuggestions, generateNotebookSummary } from "@/lib/ai/suggestions";
@@ -50,9 +50,19 @@ async function persistSuggestions(materialId: string, userId: string) {
   }
 }
 
-// Re-runs on every source add so the overview stays in sync with what's
-// actually in the notebook by the time the student starts chatting.
+// Generates once per notebook, not on every source add — this runs inside
+// every material's after() background task, and uploading several files at
+// once (multi-upload) fires several of these concurrently. Re-running it per
+// upload multiplied DB/Gemini load enough to exhaust Neon's connection pool
+// during a batch upload (observed 2026-08-11). claimNotebookSummarySlot is
+// an atomic conditional UPDATE — only the first of several concurrent
+// callers wins it, the rest return false immediately with no extra query
+// or Gemini call. A slightly stale summary after adding a 2nd/3rd source is
+// an acceptable tradeoff for avoiding that load spike.
 async function regenerateNotebookSummary(notebookId: string, userId: string) {
+  const claimed = await claimNotebookSummarySlot(notebookId, userId);
+  if (!claimed) return;
+
   const nb = await getNotebook(notebookId, userId);
   if (!nb) return;
   const result = await generateNotebookSummary(notebookId, nb.title);

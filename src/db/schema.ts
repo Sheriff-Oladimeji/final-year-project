@@ -134,10 +134,16 @@ export const notebooks = pgTable(
     userId:              text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     title:               varchar("title", { length: 255 }).notNull(),
     fileSearchStoreName: text("file_search_store_name"),
-    // NotebookLM-style overview generated once at least one source is ready,
-    // regenerated whenever a source is added — shown in the chat empty state
-    // before the student's first message. Null until generation completes.
+    // NotebookLM-style overview, generated once — shown in the chat empty
+    // state before the student's first message. Null until generation
+    // completes. summaryGenerating is an atomic claim flag: a batch upload
+    // fires several materials' background tasks concurrently, and without
+    // this they'd all see summary IS NULL and all fire the same expensive
+    // Gemini call at once (this is what exhausted the DB connection pool
+    // during a 7-file upload on 2026-08-11 — see regenerateNotebookSummary
+    // in src/actions/materials.ts).
     summary:             text("summary"),
+    summaryGenerating:   boolean("summary_generating").notNull().default(false),
     starterSuggestions:  text("starter_suggestions").array().notNull().default(sql`ARRAY[]::text[]`),
     createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:           timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { notebooks } from "@/db/schema";
 import type { Notebook } from "@/db/schema";
@@ -45,6 +45,26 @@ export async function renameNotebook(
     .where(and(eq(notebooks.id, id), eq(notebooks.userId, userId)))
     .returning();
   return rows[0] ?? null;
+}
+
+// Atomic claim so a batch of concurrent background tasks (multi-file upload)
+// doesn't all fire the same expensive summary generation at once — only the
+// caller that flips summary_generating from false to true wins, everyone
+// else gets false back and skips.
+export async function claimNotebookSummarySlot(id: string, userId: string): Promise<boolean> {
+  const rows = await db
+    .update(notebooks)
+    .set({ summaryGenerating: true })
+    .where(
+      and(
+        eq(notebooks.id, id),
+        eq(notebooks.userId, userId),
+        isNull(notebooks.summary),
+        eq(notebooks.summaryGenerating, false),
+      ),
+    )
+    .returning({ id: notebooks.id });
+  return rows.length > 0;
 }
 
 export async function setNotebookSummary(
