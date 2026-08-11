@@ -38,22 +38,29 @@ interface SourcesPanelProps {
   notebookId: string;
   materials: Material[];
   cap: number;
+  // Whether the notebook-level summary (shown in the chat empty state) has
+  // finished generating yet — false keeps polling alive even after every
+  // material itself is "ready", since summary generation is a separate,
+  // slightly later background step (see regenerateNotebookSummary).
+  notebookSummaryReady: boolean;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
 
-export function SourcesPanel({ notebookId, materials, cap, mobileOpen = false, onMobileClose }: SourcesPanelProps) {
+export function SourcesPanel({ notebookId, materials, cap, notebookSummaryReady, mobileOpen = false, onMobileClose }: SourcesPanelProps) {
   const router = useRouter();
   const count = materials.length;
   const atCap = count >= cap;
   const [collapsed, setCollapsed] = useState(false);
 
-  // Poll every 3 s while any source is indexing or ready-but-no-suggestions yet.
-  // Cap at 20 polls (~60 s) to prevent infinite loops if suggestion generation fails.
+  // Poll every 3 s while any source is indexing, ready-but-no-suggestions
+  // yet, or the notebook summary hasn't landed yet.
+  // Cap at 20 polls (~60 s) to prevent infinite loops if generation fails.
   const [pollCount, setPollCount] = useState(0);
-  const shouldPoll = materials.some(
-    (m) => m.status === "pending" || (m.status === "ready" && m.suggestions.length === 0),
-  );
+  const hasReadyMaterial = materials.some((m) => m.status === "ready");
+  const shouldPoll =
+    materials.some((m) => m.status === "pending" || (m.status === "ready" && m.suggestions.length === 0)) ||
+    (hasReadyMaterial && !notebookSummaryReady);
   useEffect(() => {
     if (!shouldPoll || pollCount >= 20) return;
     const id = setInterval(() => {

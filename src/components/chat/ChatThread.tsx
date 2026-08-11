@@ -30,6 +30,7 @@ import {
 } from "@/components/ai-elements/sources";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SessionInfoSidebar } from "./SessionInfoSidebar";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/ai/chat-types";
@@ -160,7 +161,7 @@ export function ChatThread({
                   : "The tutor answers from your sources, then asks a Quick check to track mastery."
               }
             >
-              {!noReadySources && notebook.summary ? (
+              {noReadySources ? undefined : notebook.summary ? (
                 <div className="w-full max-w-xl space-y-4 text-left">
                   <div className="flex items-center gap-1.5 text-primary">
                     <Sparkles className="size-3.5" />
@@ -191,7 +192,30 @@ export function ChatThread({
                     </div>
                   )}
                 </div>
-              ) : undefined}
+              ) : (
+                // Materials are ready but the background summary generation
+                // (regenerateNotebookSummary) hasn't landed yet — SourcesPanel
+                // keeps polling until notebook.summary is set, which swaps
+                // this skeleton for the real content automatically.
+                <div className="w-full max-w-xl space-y-4 text-left" aria-label="Generating notebook summary">
+                  <div className="flex items-center gap-1.5 text-primary">
+                    <Sparkles className="size-3.5 animate-pulse" />
+                    <span className="text-xs font-medium tracking-wide uppercase">
+                      Generating summary…
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Skeleton className="h-7 w-40 rounded-full" />
+                    <Skeleton className="h-7 w-48 rounded-full" />
+                    <Skeleton className="h-7 w-36 rounded-full" />
+                  </div>
+                </div>
+              )}
             </ConversationEmptyState>
           )}
 

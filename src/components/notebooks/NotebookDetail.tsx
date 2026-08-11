@@ -93,6 +93,7 @@ export function NotebookDetail({
           notebookId={notebook.id}
           materials={materials}
           cap={MATERIALS_PER_NOTEBOOK_CAP}
+          notebookSummaryReady={notebook.summary !== null}
           mobileOpen={mobileSources}
           onMobileClose={() => setMobileSources(false)}
         />
