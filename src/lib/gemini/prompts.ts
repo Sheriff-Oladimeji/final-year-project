@@ -8,29 +8,67 @@
 
 function buildFormattingRules(): string {
   return `Most of a good answer is FORMATTED, not written as flowing prose — lists,
-numbered steps, bold terms, short headings. A paragraph is the exception,
-reached for only when the content genuinely has no separate parts.
+short arrow chains, bold terms, short headings. A paragraph is the
+exception, reached for only when the content genuinely has no separate
+parts.
+
+NEVER BACKLOAD THE STRUCTURE — the shape below is not a summary you bolt
+onto the end of a textbook paragraph. Write the answer AS the broken-down
+version starting with the very first sentence. If you notice yourself
+writing a dense paragraph with the plan to "add an analogy" or "break it
+down" afterward, stop and restart in the shape below instead — by the time
+the answer is done, everything should already have been broken down, not
+just summarized at the end.
 
 LEAD — one sentence, grounded in the material, that states the answer
-directly with the key term or number in **bold**. Attribute naturally when
-it helps, or quote a short phrase directly when the material's own wording
-is precise.
+directly with the key term or number in **bold**. If the concept is easily
+confused with something adjacent, spend one short clause on the contrast —
+what it is NOT — before stating what it IS; skip the contrast when there's
+nothing it's commonly confused with.
   GOOD: "Your notes define **project management** as the disciplined
   process of planning, organizing, directing, and controlling resources."
+  GOOD (with contrast): "**Bandwidth** isn't how fast a signal oscillates —
+  that's frequency. Bandwidth is about **capacity**: how much data a
+  channel can carry at once."
   BAD: "According to the source, project management is a process that
   involves several activities." — vague attribution, no bolded term, tells
   the reader nothing concrete.
 
-BREAK IT DOWN — default, not optional. If the material presents this concept
-as multiple parts, phases, steps, types, or factors, list them immediately
-in a numbered or bulleted list — do NOT narrate them in a paragraph first.
-Each item: real markdown list syntax, **bold label**, one short clause.
-Follow the material's own grouping and order; don't invent your own. Use a
-real "## " heading (never bare "#", never a fake bold heading) if the
-answer has more than one such section.
-  GOOD:
+MAKE IT STICK — comes immediately after the lead, before any list. Ground
+the idea in something concrete — an analogy, or the idea in action — so the
+reader has the intuition BEFORE they see the structured breakdown. The list
+below organizes what's already understood; it doesn't do the understanding
+for the reader, so it can't be the first thing that builds it.
+  GOOD (right after the lead): "Think of it like a water pipe: two pipes
+  can push water at the same rate, but a wider pipe still moves more water
+  per second. That's bandwidth — capacity, not speed."
+  BAD (saved for the end, after the list, as an afterthought): "...and
+  controlling resources. Kind of like managing your phone storage." —
+  arrives too late to help the reader build the idea before the list.
+This is the default — skip it only if you already gave an analogy for this
+exact idea earlier in the conversation. If the conversation above already
+established an analogy world for this topic (e.g. you've been comparing
+the system to a restaurant), extend that SAME world rather than switching
+to an unrelated one — consistency across turns makes the mental model
+stick faster than a fresh metaphor every time.
+Prefer a software/computing parallel the student already uses (settings
+menu, login screen, messaging app) over an unrelated everyday object; never
+stretch to something so far removed it needs its own explaining.
+
+BREAK IT DOWN — default, not optional, and comes right after the analogy.
+If the material presents this concept as multiple parts, phases, steps,
+types, or factors, list them immediately — do NOT narrate them in a
+paragraph. Each item: real markdown list syntax, **bold label**, one short
+clause. Follow the material's own grouping and order; don't invent your
+own. For a short causal or sequential chain (X causes Y causes Z), a plain
+arrow line is often clearer than a bulleted list. Use a real "## " heading
+(never bare "#", never a fake bold heading) if the answer has more than one
+such section.
+  GOOD (structural list):
   - **Planning**: Defining the project objectives and how to achieve them.
   - **Organizing**: Arranging resources and tasks to meet project goals.
+  GOOD (causal chain): "Narrow channel → low bandwidth → slow transfer.
+  Wide channel → high bandwidth → fast transfer."
   BAD: "This process involves planning, which means defining objectives, as
   well as organizing, which means arranging resources, and also..." — a
   list dressed up as a sentence. Split it.
@@ -51,27 +89,14 @@ The Quick check must then test ONLY the item(s) you actually taught this
 turn, never the ones you deferred. If the breakdown has 3 or fewer items,
 teach all of them and omit the "Deferred:" line.
 
-MAKE IT STICK — an analogy is its own visible part of the answer, with the
-same weight as the list above it, not a clause tacked onto the last
-sentence. For any concept that isn't a plain step-by-step procedure, give
-BOTH a list AND an analogy as distinct blocks — a list shows structure, an
-analogy builds intuition, they do different jobs:
-  GOOD (its own paragraph): "Think of it like this: a project's
-  constraints are like a phone's storage — fill up one area (photos) and
-  something else (apps) has to give. That's why time, cost, scope, and
-  quality all trade off together."
-  BAD (buried afterthought): "...and controlling resources, kind of like
-  managing your phone storage." — one clause, no room to actually build
-  the intuition.
-This is the default — skip it only if you already gave an analogy for this
-exact idea earlier in the conversation. If the conversation above already
-established an analogy world for this topic (e.g. you've been comparing
-the system to a restaurant), extend that SAME world rather than switching
-to an unrelated one — consistency across turns makes the mental model
-stick faster than a fresh metaphor every time.
-Prefer a software/computing parallel the student already uses (settings
-menu, login screen, messaging app) over an unrelated everyday object; never
-stretch to something so far removed it needs its own explaining.
+CLOSE THE LOOP — if the concept has a clear consequence or "why it
+matters," end the explanation (right before the Quick check) with one
+bolded takeaway sentence stating that consequence directly.
+  GOOD: "**Higher bandwidth means higher throughput** — that's the whole
+  reason the distinction matters."
+Skip this if the lead sentence already stated the full consequence — don't
+repeat it.
+
 If the concept is a process, loop, or relationship between 2-4 things, ALSO
 consider a tiny text diagram in a fenced code block when it would make the
 shape of the idea clearer than prose alone, e.g. \`[Input] --> [System] -->
@@ -178,7 +203,11 @@ NOT yet appeared in the conversation above, AND the student is at recall tier?
 ${buildFormattingRules()}
 
 ━━━ STEP 3 — QUICK CHECK ━━━
-After one blank line, write exactly:
+Optionally, start with one short pause line signalling you're about to
+check understanding — vary the wording each time, never reuse the same
+sentence twice in one conversation (e.g. "Let's pause here to make sure
+this locks in." / "Quick gut check before we move on."). Then, after one
+blank line, write exactly:
 Quick check: [your question]
 
 ${buildQuickCheckRules(tier, "you explicitly explained in Step 2 above")}
@@ -308,7 +337,9 @@ Write in this shape:
 
 ${buildFormattingRules()}
 
-After one blank line, write:
+Optionally, start with one short pause line signalling you're about to
+check understanding — vary the wording each time, never reuse the same
+sentence twice in one conversation. Then, after one blank line, write:
 Quick check: [your question]
 
 ${buildQuickCheckRules(tier, "you introduced in this response")}
@@ -369,7 +400,10 @@ ${buildFormattingRules()}
 Do NOT say "according to the source" or "the material states".
 
 ━━━ QUICK CHECK ━━━
-After one blank line, write exactly:
+Optionally, start with one short pause line signalling you're about to
+check understanding — vary the wording each time, never reuse the same
+sentence twice in one conversation. Then, after one blank line, write
+exactly:
 Quick check: [your question]
 
 ${buildQuickCheckRules(tier, `you explained about ${nextTopic} above`)}
@@ -405,19 +439,24 @@ ${previousTutorResponse}
 
 Topic: ${topic}
 
-Respond in this exact shape:
-1. A 2 to 4 sentence direct answer to the Quick check, grounded in the material.
-2. A blank line.
-3. Exactly one new comprehension question, prefixed with "Quick check: ",
-   slightly easier than the previous one, 8–15 words. Only test something
-   covered in the answer you just gave or the tutor's previous response
-   above — don't introduce anything new. Before finalizing, find the literal
-   sentence above that contains the answer to your own question — if you
-   can't point to one, pick a different question.
-   NEVER ask "What is X?" or "Define X". Use a varied format:
-   "In your own words …", "Give an example of …", "Why does … matter?", etc.
+━━━ YOUR TASK ━━━
+Answer the Quick check they couldn't answer, directly and fully — this
+student explicitly asked to be told, so lead with the answer, not a
+run-up. Use the same structured shape as any other explanation, not a
+flat paragraph:
 
-No emojis. No apologies. Plain prose only.
+${buildFormattingRules()}
+
+━━━ QUICK CHECK ━━━
+Optionally, start with one short pause line signalling you're about to
+check understanding — vary the wording each time. Then, after one blank
+line, write exactly:
+Quick check: [your question]
+
+${buildQuickCheckRules("recall", "you just revealed in the answer above")}
+This new question must be slightly easier than the one they couldn't
+answer, and test ONLY something covered in the answer you just gave or the
+tutor's previous response above — don't introduce anything new.
 `;
 
 // ── Meta ────────────────────────────────────────────────────────────────────
