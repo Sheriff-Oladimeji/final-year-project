@@ -6,7 +6,7 @@
 // project for the pattern this borrows: small composable buildXxx()
 // functions with concrete GOOD/BAD example pairs, not just abstract prose.
 
-function buildFormattingRules(): string {
+export function buildFormattingRules(): string {
   return `Most of a good answer is FORMATTED, not written as flowing prose — lists,
 short arrow chains, bold terms, short headings. A paragraph is the
 exception, reached for only when the content genuinely has no separate

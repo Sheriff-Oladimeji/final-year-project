@@ -1,0 +1,39 @@
+# Tests INTENT_CLASSIFIER_TEMPLATE against messy real-tester-style input — including
+# the exact garbled, typo-heavy phrasing seen in real usability-test transcripts,
+# where a student mixes a genuine attempt with a confused follow-up question.
+
+- description: "garbled real-tester-style reply — attempt + confusion mixed together"
+  vars:
+    lastGuidedQuestion: "Quick check: In your own words, what's the difference between bandwidth and frequency?"
+    userText: "idk the answer explain betr what I uandtean dis now teh diffnec btwen eah ther iknow bandiwtdh is about cpaicty but yor alogy of water sees conrtatdicto they supplyw taer at teh sma ete evry secnd taht is frneuncy crelct bu hy is wth die diffrnet ? im cosuse dif you do somegehing at ehc ame trate whats i ethddffrnec"
+    expected: answer_attempt
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches
+
+- description: "quiz me phrasing must route to new_question, not meta"
+  vars:
+    lastGuidedQuestion: ""
+    userText: "quiz me on this"
+    expected: new_question
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches
+
+- description: "clean give-up phrase"
+  vars:
+    lastGuidedQuestion: "Quick check: In your own words, what does recursion need to stop?"
+    userText: "just tell me the answer"
+    expected: give_up
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches
+
+- description: "meta question about the app itself"
+  vars:
+    lastGuidedQuestion: ""
+    userText: "how does the mastery score work"
+    expected: meta
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches

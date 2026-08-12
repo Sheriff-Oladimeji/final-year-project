@@ -1,0 +1,70 @@
+# Tests buildFormattingRules() — the "explain and break it down clearly" claim.
+# Checks the exact failure pattern flagged from the ChatGPT Study Mode reference:
+# lead sentence, THEN analogy, THEN structured breakdown — never a textbook
+# paragraph with the breakdown/analogy bolted on at the end.
+
+- description: "bandwidth — disambiguation-prone concept, multi-factor breakdown"
+  vars:
+    materials: |
+      Bandwidth refers to the maximum rate of data transfer across a network
+      path, measured in bits per second. It differs from frequency, which
+      measures oscillations per second (Hz) — a signal can oscillate quickly
+      while still carrying little data. Factors affecting bandwidth include
+      the transmission medium, the length of the medium, and the signaling
+      technique used. Higher bandwidth results in higher throughput.
+    question: "What is bandwidth?"
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:noBackload
+    - type: javascript
+      value: file://assertions/checks.js:noFiller
+    - type: javascript
+      value: file://assertions/checks.js:hasBoldTerm
+    - type: llm-rubric
+      provider: google:gemini-2.5-flash
+      threshold: 0.8
+      value: |
+        Score 0.0-1.0. Score 1.0 only if ALL of these hold — otherwise score
+        proportionally lower and say exactly which failed:
+        1. Opens with a direct one-sentence answer, not a run-up or "according
+           to the material" framing.
+        2. An analogy or concrete real-world grounding appears right after the
+           lead sentence — BEFORE any bulleted/numbered list — not only at the
+           very end as an afterthought.
+        3. The answer is not one dense textbook-style paragraph with structure
+           added only as a trailing summary.
+        4. Multi-factor content (the things bandwidth depends on) is broken
+           into a real list, not narrated in prose.
+        5. No filler, no restating the question, no "Great question!".
+
+- description: "project management planning/organizing/directing/controlling — chunk-limit case"
+  vars:
+    materials: |
+      Project management is the disciplined process of planning, organizing,
+      directing, and controlling resources to achieve specific goals within
+      constraints of time, cost, scope, and quality. Planning defines
+      objectives and how to achieve them. Organizing arranges resources and
+      tasks to meet project goals. Directing guides and motivates the team
+      toward the objectives. Controlling monitors progress and corrects
+      deviations from the plan.
+    question: "What does project management involve?"
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:noBackload
+    - type: javascript
+      value: file://assertions/checks.js:noFiller
+    - type: javascript
+      value: file://assertions/checks.js:hasBoldTerm
+    - type: llm-rubric
+      provider: google:gemini-2.5-flash
+      threshold: 0.8
+      value: |
+        Score 0.0-1.0. Score 1.0 only if ALL of these hold:
+        1. Opens with a direct one-sentence answer, key term bolded.
+        2. An analogy appears right after the lead, before any list.
+        3. The material lists 4 distinct phases (planning, organizing,
+           directing, controlling) — the answer should teach only 2-3 of them
+           this turn (a hard chunk limit) rather than dumping all 4 at once,
+           OR if it does teach a 4th, it should be a clear intentional
+           exception, not an accidental wall of content.
+        4. No filler, no textbook-paragraph-first-breakdown-last pattern.

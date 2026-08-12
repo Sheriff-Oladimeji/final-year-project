@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "Explanation formatting — buildFormattingRules() (lead / analogy / breakdown order, no-backload, no-filler)"
+
+prompts:
+  - file://.compiled/evals/prompts/explainFormat.js
+
+providers:
+  - id: google:gemini-2.5-flash
+    label: gemini-2.5-flash
+    config:
+      apiKeyEnvar: GEMINI_API_KEY
+
+tests: file://tests/formatting.yaml
+
+commandLineOptions:
+  maxConcurrency: 3
+
+outputPath: results/formatting-results.json

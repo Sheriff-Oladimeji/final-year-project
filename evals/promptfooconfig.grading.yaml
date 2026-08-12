@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "Adaptive grading — CLASSIFY_CHECK_TEMPLATE"
+
+prompts:
+  - file://.compiled/evals/prompts/gradeCheck.js
+
+providers:
+  - id: google:gemini-2.5-flash
+    label: gemini-2.5-flash
+    config:
+      apiKeyEnvar: GEMINI_API_KEY
+
+tests: file://tests/grading.yaml
+
+commandLineOptions:
+  maxConcurrency: 3
+
+outputPath: results/grading-results.json

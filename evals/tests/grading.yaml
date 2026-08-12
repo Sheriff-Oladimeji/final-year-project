@@ -1,0 +1,77 @@
+# Tests CLASSIFY_CHECK_TEMPLATE — the "adaptive grading" claim: does it reward
+# understanding expressed in the student's own words/analogy, and still catch
+# real misunderstanding even when the right vocabulary is present?
+
+- description: "own-words correct answer, zero vocabulary overlap with the tutor's wording"
+  vars:
+    tutorResponse: |
+      **Bandwidth** isn't how fast a signal oscillates — that's frequency.
+      Bandwidth is about **capacity**: how much data a channel can carry at
+      once. Think of it like a water pipe: two pipes can push water at the
+      same rate, but a wider pipe still moves more water per second.
+
+      Quick check: In your own words, what's the difference between
+      bandwidth and frequency?
+    studentReply: "frequency is how often something happens per second, but bandwidth is how much can go through at once, like a wide pipe vs a narrow one"
+    expected: correct
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches
+
+- description: "own analogy, correct, totally different domain from the taught example"
+  vars:
+    tutorResponse: |
+      **Recursion** is when a function solves a problem by calling itself on
+      a smaller version of that same problem, until it reaches a base case
+      that stops the calls.
+
+      Quick check: In your own words, how does recursion know when to stop?
+    studentReply: "it's like Russian nesting dolls — you keep opening smaller ones until you hit the smallest one that doesn't open anymore, that's the base case"
+    expected: correct
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches
+
+- description: "vague, misses the key distinction — should be correct_with_hint, not correct"
+  vars:
+    tutorResponse: |
+      **Bandwidth** isn't how fast a signal oscillates — that's frequency.
+      Bandwidth is about **capacity**: how much data a channel can carry at
+      once.
+
+      Quick check: In your own words, what's the difference between
+      bandwidth and frequency?
+    studentReply: "bandwidth is about the pipe being wide I think"
+    expected: correct_with_hint
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches
+
+- description: "right vocabulary, wrong understanding — must not pass on keyword overlap alone"
+  vars:
+    tutorResponse: |
+      **Recursion** is when a function solves a problem by calling itself on
+      a smaller version of that same problem, until it reaches a base case
+      that stops the calls.
+
+      Quick check: In your own words, how does recursion know when to stop?
+    studentReply: "recursion is when a loop keeps running forever using a base case and the stack"
+    expected: incorrect
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches
+
+- description: "genuinely wrong, different domain, no hedging"
+  vars:
+    tutorResponse: |
+      **Bandwidth** isn't how fast a signal oscillates — that's frequency.
+      Bandwidth is about **capacity**: how much data a channel can carry at
+      once.
+
+      Quick check: In your own words, what's the difference between
+      bandwidth and frequency?
+    studentReply: "they're the same thing, just different names for how fast data moves"
+    expected: incorrect
+  assert:
+    - type: javascript
+      value: file://assertions/checks.js:labelMatches

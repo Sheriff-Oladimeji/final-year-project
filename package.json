@@ -9,7 +9,13 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:migrate:drizzle": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "eval:compile": "rm -rf evals/.compiled && tsc --module commonjs --target es2020 --moduleResolution node --esModuleInterop --skipLibCheck --outDir evals/.compiled src/lib/gemini/prompts.ts evals/prompts/gradeCheck.ts evals/prompts/classifyIntent.ts evals/prompts/explainFormat.ts",
+    "eval:grading": "npm run eval:compile && cd evals && export GEMINI_API_KEY=$(grep '^GEMINI_API_KEY=' ../.env | cut -d '=' -f2-) PROMPTFOO_CONFIG_DIR=\"$(pwd)/.promptfoo-state\" && npx promptfoo@0.120.0 eval -c promptfooconfig.grading.yaml",
+    "eval:intent": "npm run eval:compile && cd evals && export GEMINI_API_KEY=$(grep '^GEMINI_API_KEY=' ../.env | cut -d '=' -f2-) PROMPTFOO_CONFIG_DIR=\"$(pwd)/.promptfoo-state\" && npx promptfoo@0.120.0 eval -c promptfooconfig.intent.yaml",
+    "eval:formatting": "npm run eval:compile && cd evals && export GEMINI_API_KEY=$(grep '^GEMINI_API_KEY=' ../.env | cut -d '=' -f2-) PROMPTFOO_CONFIG_DIR=\"$(pwd)/.promptfoo-state\" && npx promptfoo@0.120.0 eval -c promptfooconfig.formatting.yaml",
+    "eval:prompts": "npm run eval:compile && npm run eval:grading && npm run eval:intent && npm run eval:formatting",
+    "eval:view": "cd evals && PROMPTFOO_CONFIG_DIR=\"$(pwd)/.promptfoo-state\" npx promptfoo@0.120.0 view"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.70",

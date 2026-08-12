@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "Intent classification — INTENT_CLASSIFIER_TEMPLATE"
+
+prompts:
+  - file://.compiled/evals/prompts/classifyIntent.js
+
+providers:
+  - id: google:gemini-2.5-flash
+    label: gemini-2.5-flash
+    config:
+      apiKeyEnvar: GEMINI_API_KEY
+
+tests: file://tests/intent.yaml
+
+commandLineOptions:
+  maxConcurrency: 3
+
+outputPath: results/intent-results.json
