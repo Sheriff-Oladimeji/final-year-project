@@ -119,12 +119,16 @@ Rules for the Quick check:
   conversation — test something NEW.
 - NEVER ask "What is X?" or "Define X" — too shallow.
 - Choose the format that best fits what you just taught — but the format
-  must match content you actually explained, not just named or listed:
-    "In your own words, …" — only for something you explained, not just listed
+  must match content you actually explained, not just named or listed.
+  "In your own words, …" is the default: it invites the student's own
+  phrasing or analogy instead of testing whether they can recite yours, and
+  is graded exactly the same as any other format (see grading rules
+  elsewhere in this app — a correct paraphrase always counts as correct).
+    "In your own words, …" — the default; only needs something you explained, not just listed
     "Give an example of …" — only if you gave or clearly implied an example
     "Why does … matter?" — only if you explained the reasoning, not just the term
     "What would happen if …?"  |  "How does … differ from …?"  |  "How would you apply … to …?"
-- Tier guidance: ${tier === "recall" ? "recall — confirm they grasped the core idea you just explained" : tier === "application" ? "application — ask them to use or apply what you just explained" : "analysis — ask them to compare, evaluate, or reason about what you just explained"}.
+- Tier guidance: ${tier === "recall" ? "recall — confirm they grasped the core idea you just explained; lean toward \"In your own words, …\"" : tier === "application" ? "application — ask them to use or apply what you just explained" : "analysis — ask them to compare, evaluate, or reason about what you just explained"}.
 - 8–15 words. No hints embedded in the question.
 
 No emojis. No "Great question!". No apologies.`;
@@ -225,14 +229,40 @@ ${previousTutorResponse}
 
 Student's reply: ${studentReply}
 
-Classify the reply as exactly one of:
-  correct
-  correct_with_hint
-  incorrect
+GRADING PHILOSOPHY — this is the most important part, read it carefully:
+Judge whether the student UNDERSTANDS the idea, not whether they used the
+same words the tutor used. A correct answer in the student's own phrasing,
+their own analogy, or their own example is exactly as correct as one that
+echoes the tutor's exact terminology — reward the understanding, not the
+vocabulary match. This tutor explicitly teaches through analogies and asks
+open-ended "in your own words" questions; grading that penalizes a student
+for not repeating the source material's wording directly contradicts that
+and must never happen.
 
-Use "correct_with_hint" when the answer is essentially right but partial,
-ambiguous, or needed scaffolding. Reply with only the classification label.
-No explanation.
+  GOOD grading: tutor taught "iterative design means continuously refining
+  a system based on user feedback." Student answers "it's like adjusting a
+  recipe as you keep tasting it while cooking, instead of just cooking it
+  once and serving it." → correct. Different words, the student's own
+  analogy, zero overlap in vocabulary with the tutor's explanation — but it
+  demonstrates the exact same understanding.
+
+  BAD grading: marking that same answer "incorrect" or "correct_with_hint"
+  because it didn't use the words "iterative," "system," or "feedback," or
+  because it used a cooking analogy instead of the tutor's own example.
+  Also BAD: requiring the student's phrasing to closely resemble the source
+  material's or tutor's wording before counting it as correct.
+
+Classify the reply as exactly one of:
+  correct — demonstrates real understanding, in any phrasing, wording, or
+    analogy the student chooses, even with zero lexical overlap with the
+    tutor's explanation
+  correct_with_hint — the core idea is there but genuinely incomplete,
+    ambiguous, or needed scaffolding to reach (not just "phrased
+    differently" — that's still "correct")
+  incorrect — the understanding itself is wrong or missing, not merely
+    expressed in different words
+
+Reply with only the classification label. No explanation.
 `;
 
 // ── After a correct (or correct-with-hint) answer — progress forward ─────────
