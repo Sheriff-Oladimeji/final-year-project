@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { geminiModel } from "./model";
-import { SUGGESTIONS_PROMPT, NOTEBOOK_SUMMARY_TEMPLATE } from "@/lib/gemini/prompts";
+import { SUGGESTIONS_PROMPT, NOTEBOOK_SUMMARY_TEMPLATE, EXTRACT_TOPICS_TEMPLATE } from "@/lib/gemini/prompts";
 import type { Material } from "@/db/schema";
 import { db } from "@/db";
 import { notebooks } from "@/db/schema";
@@ -43,17 +43,15 @@ export async function generateMaterialSuggestions(material: Material): Promise<s
 }
 
 /**
- * Notebook-level overview (summary + starter questions + topic taxonomy)
- * shown before the student's first message / used to pre-seed gradable
- * topics. Only fires once per notebook, on its first ready material — see
- * the claim-slot gating in regenerateNotebookSummary() in
- * src/actions/materials.ts, and the note there about materials added later
- * not retroactively contributing to the taxonomy.
+ * Notebook-level overview (summary + starter questions) shown before the
+ * student's first message. Generated once per notebook — see the claim-slot
+ * gating in regenerateNotebookSummary() in src/actions/materials.ts. Topic
+ * taxonomy extraction is fully independent — see extractNotebookTopics below.
  */
 export async function generateNotebookSummary(
   notebookId: string,
   notebookTitle: string,
-): Promise<{ summary: string; suggestions: string[]; topics: string[] } | null> {
+): Promise<{ summary: string; suggestions: string[] } | null> {
   const notebookRows = await db
     .select({ fileSearchStoreName: notebooks.fileSearchStoreName })
     .from(notebooks)
@@ -74,27 +72,65 @@ export async function generateNotebookSummary(
 
     const match = text.match(/\{[\s\S]*?\}/);
     if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { summary?: unknown; suggestions?: unknown; topics?: unknown };
+    const parsed = JSON.parse(match[0]) as { summary?: unknown; suggestions?: unknown };
     if (typeof parsed.summary !== "string" || !parsed.summary.trim()) return null;
 
     const suggestions = Array.isArray(parsed.suggestions)
       ? parsed.suggestions.slice(0, 3).filter((s): s is string => typeof s === "string")
       : [];
 
-    // Best-effort: a malformed/missing topics field must never fail the
-    // whole call — summary + suggestions already work today and must keep
-    // working even if this newer field misbehaves.
+    return { summary: parsed.summary.trim(), suggestions };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts (and reconciles against) this notebook's topic taxonomy. Grounds
+ * across the WHOLE file-search store every call — not scoped to a single
+ * material, since Gemini File Search has no first-class single-document
+ * retrieval scope without custom_metadata plumbing this app doesn't do yet
+ * — and feeds in the existing topic list so genuinely repeated concepts
+ * reuse their exact label instead of spawning near-duplicates. Called from
+ * regenerateTopicTaxonomy() in src/actions/materials.ts on every material
+ * upload, not gated to the notebook's first material.
+ */
+export async function extractNotebookTopics(
+  notebookId: string,
+  notebookTitle: string,
+  existingTopics: string[],
+): Promise<string[]> {
+  const notebookRows = await db
+    .select({ fileSearchStoreName: notebooks.fileSearchStoreName })
+    .from(notebooks)
+    .where(eq(notebooks.id, notebookId))
+    .limit(1);
+
+  const storeName = notebookRows[0]?.fileSearchStoreName;
+  if (!storeName) return [];
+
+  try {
+    const { text } = await generateText({
+      model: geminiModel,
+      tools: {
+        file_search: google.tools.fileSearch({ fileSearchStoreNames: [storeName] }),
+      },
+      prompt: EXTRACT_TOPICS_TEMPLATE(notebookTitle, existingTopics),
+    });
+
+    const match = text.match(/\{[\s\S]*?\}/);
+    if (!match) return [];
+    const parsed = JSON.parse(match[0]) as { topics?: unknown };
     const rawTopics = Array.isArray(parsed.topics) ? parsed.topics : [];
-    const topics = Array.from(
+
+    return Array.from(
       new Set(
         rawTopics
           .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
           .map(normalizeTopicLabel),
       ),
-    ).slice(0, 15);
-
-    return { summary: parsed.summary.trim(), suggestions, topics };
+    );
   } catch {
-    return null;
+    return [];
   }
 }

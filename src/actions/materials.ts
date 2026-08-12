@@ -15,10 +15,10 @@ import {
   MATERIALS_PER_NOTEBOOK_CAP,
 } from "@/db/queries/materials";
 import { getNotebook, touchNotebook, setNotebookSummary, claimNotebookSummarySlot } from "@/db/queries/notebooks";
-import { getOrCreateTopic } from "@/db/queries/topics";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadDocumentToStore, deleteDocumentFromStore } from "@/lib/gemini/fileSearch";
 import { generateMaterialSuggestions, generateNotebookSummary } from "@/lib/ai/suggestions";
+import { regenerateTopicTaxonomy } from "@/lib/ai/topic-taxonomy";
 import { detectMaterialKind, mimeTypeForKind } from "@/lib/materials";
 
 async function requireUser() {
@@ -61,16 +61,9 @@ async function persistSuggestions(materialId: string, userId: string) {
 // or Gemini call. A slightly stale summary after adding a 2nd/3rd source is
 // an acceptable tradeoff for avoiding that load spike.
 //
-// Same one-shot-per-notebook limitation applies to the topic taxonomy seeded
-// below: since the slot only claims on a notebook's first ready material,
-// materials added afterward don't retroactively extend the taxonomy — new
-// concepts from later uploads fall back to CLASSIFY_TOPIC_TEMPLATE's
-// free-form path instead of the closed set. Most notebooks get their few
-// sources uploaded together before the first chat message, so this is
-// low-impact in practice, but it's a known gap, not a solved one. A proper
-// fix would gate re-extraction on "zero topic rows" instead of "summary is
-// null", feeding the existing labels back into the prompt so re-runs don't
-// duplicate them — scoped as a fast-follow, not this pass.
+// Topic taxonomy extraction is fully independent of this — see
+// regenerateTopicTaxonomy below — and does NOT share this one-shot
+// limitation; it re-runs on every new material.
 async function regenerateNotebookSummary(notebookId: string, userId: string) {
   const claimed = await claimNotebookSummarySlot(notebookId, userId);
   if (!claimed) return;
@@ -80,14 +73,12 @@ async function regenerateNotebookSummary(notebookId: string, userId: string) {
   const result = await generateNotebookSummary(notebookId, nb.title);
   if (result) {
     await setNotebookSummary(notebookId, userId, result.summary, result.suggestions);
-    // Below 3 usable labels, the closed-set preference in CLASSIFY_TOPIC_TEMPLATE
-    // gives no real benefit over the free-form fallback — don't let one
-    // mediocre auto-generated label become "the" taxonomy for this notebook.
-    if (result.topics.length >= 3) {
-      await Promise.all(result.topics.map((label) => getOrCreateTopic(userId, notebookId, label)));
-    }
   }
 }
+
+// regenerateTopicTaxonomy lives in src/lib/ai/topic-taxonomy.ts, not here —
+// see that file's top comment for why it can't be defined in a "use server"
+// module.
 
 export async function uploadMaterialAction(formData: FormData) {
   const session = await requireUser();
@@ -138,6 +129,7 @@ export async function uploadMaterialAction(formData: FormData) {
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
       await regenerateNotebookSummary(notebookId, userId);
+      await regenerateTopicTaxonomy(notebookId, userId);
     } catch (err) {
       console.error("[uploadMaterialAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");
@@ -198,6 +190,7 @@ export async function submitYoutubeAction(formData: FormData) {
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
       await regenerateNotebookSummary(notebookId, userId);
+      await regenerateTopicTaxonomy(notebookId, userId);
     } catch (err) {
       console.error("[submitYoutubeAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");

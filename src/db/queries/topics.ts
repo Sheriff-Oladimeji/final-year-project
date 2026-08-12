@@ -77,8 +77,9 @@ export interface TopicWithHistory {
   updatedAt: Date;
   tier: Tier;
   // False for a topic pre-seeded from the material's own structure at
-  // upload time (see regenerateNotebookSummary) that the student hasn't
-  // asked about yet — distinguishes "not yet studied" from a genuine 0/100.
+  // upload time (see regenerateTopicTaxonomy in src/lib/ai/topic-taxonomy.ts)
+  // that the student hasn't asked about yet — distinguishes "not yet
+  // studied" from a genuine 0/100.
   hasInteracted: boolean;
   recentHistory: ScoreHistoryEntry[];
 }

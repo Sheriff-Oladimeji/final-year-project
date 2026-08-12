@@ -145,6 +145,17 @@ export const notebooks = pgTable(
     summary:             text("summary"),
     summaryGenerating:   boolean("summary_generating").notNull().default(false),
     starterSuggestions:  text("starter_suggestions").array().notNull().default(sql`ARRAY[]::text[]`),
+    // Topic taxonomy extraction — unlike summaryGenerating above (a one-shot
+    // gate checked via `summary IS NULL`, which can never be re-claimed once
+    // set), this must be able to run again every time a new material is
+    // added, so it's a genuinely resettable mutex: topicsExtracting flips
+    // true while a run is in flight and always flips back to false when it
+    // ends, win or lose. topicsExtractedAt is a snapshot of the latest ready
+    // material's indexedAt as of the start of the last successful run (never
+    // wall-clock completion time — see regenerateTopicTaxonomy in
+    // src/actions/materials.ts for why that distinction matters).
+    topicsExtracting:    boolean("topics_extracting").notNull().default(false),
+    topicsExtractedAt:   timestamp("topics_extracted_at", { withTimezone: true }),
     createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:           timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

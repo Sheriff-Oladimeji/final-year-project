@@ -1,4 +1,4 @@
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, max } from "drizzle-orm";
 import { db } from "@/db";
 import { materials } from "@/db/schema";
 import type { Material } from "@/db/schema";
@@ -88,4 +88,18 @@ export async function listReadyMaterialsInNotebook(
 export async function countAllMaterials(): Promise<number> {
   const rows = await db.select({ n: count() }).from(materials);
   return rows[0]?.n ?? 0;
+}
+
+// Used by regenerateTopicTaxonomy (src/actions/materials.ts) to decide
+// whether a notebook has ready content newer than its last taxonomy
+// extraction pass.
+export async function getLatestReadyMaterialIndexedAt(
+  userId: string,
+  notebookId: string,
+): Promise<Date | null> {
+  const rows = await db
+    .select({ latest: max(materials.indexedAt) })
+    .from(materials)
+    .where(and(eq(materials.userId, userId), eq(materials.notebookId, notebookId), eq(materials.status, "ready")));
+  return rows[0]?.latest ?? null;
 }

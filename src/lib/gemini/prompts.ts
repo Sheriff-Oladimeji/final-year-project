@@ -560,18 +560,39 @@ Use file_search across ALL the course materials in this notebook and produce:
      different angles (a definition, a mechanism, an application, a
      trade-off) — vary them, don't all ask "what is X?".
 
-3. TOPICS — extract 5 to 15 canonical topic labels from the material's own
-   structure (its actual headings, sections, and chapters — not invented
-   groupings). Each label 2 to 5 words, same style as e.g. "binary search
-   trees" or "TCP/IP model" — no numbering, no punctuation. These become
-   the fixed set of gradable topics for this notebook, so:
-   - One label per genuinely distinct concept/section — do not split one
-     section into multiple near-duplicate labels, and do not merge two
-     clearly separate sections into one label.
-   - Use the material's own terminology, not a paraphrase.
-   - If the material has no clear internal structure (no headings/sections
-     you can point to), return an empty array rather than guessing.
+Reply with ONLY this JSON object, no other text, no markdown fences:
+{"summary": "...", "suggestions": ["...", "...", "..."]}
+`;
+
+// ── Topic taxonomy extraction — runs on every material upload, independent
+// of the summary above, so it stays current as sources are added. See
+// regenerateTopicTaxonomy in src/actions/materials.ts. ────────────────────
+
+export const EXTRACT_TOPICS_TEMPLATE = (
+  notebookTitle: string,
+  existingTopics: string[],
+) => `\
+You are maintaining the topic taxonomy for the notebook "${notebookTitle}".
+
+Use file_search across ALL the course materials currently in this notebook
+— not just the newest one — and produce a complete, current list of topic
+labels covering everything the materials actually contain.
+
+${
+  existingTopics.length > 0
+    ? `Topics already tracked for this notebook:\n${existingTopics.map((t) => `- ${t}`).join("\n")}\n\nReuse an existing label EXACTLY (same text) whenever a concept is already covered by one of these, even if that concept also appears in a newly added document. Only add a genuinely NEW label for a concept not covered by any label above. Some of these labels may be imperfect or predate this taxonomy system — match against them as they are, don't try to rewrite or "clean up" existing labels.`
+    : "This notebook has no tracked topics yet — extract the initial set."
+}
+
+Rules for each label:
+- 2 to 5 words, matching the material's own terminology (e.g. "binary
+  search trees" or "TCP/IP model") — no numbering, no punctuation.
+- One label per genuinely distinct concept/section from the material's own
+  structure (headings, sections, chapters) — do not split one section into
+  near-duplicates, do not merge two separate sections into one label.
+- If the material has no clear internal structure, return the existing
+  list unchanged rather than guessing at new labels.
 
 Reply with ONLY this JSON object, no other text, no markdown fences:
-{"summary": "...", "suggestions": ["...", "...", "..."], "topics": ["...", "..."]}
+{"topics": ["...", "..."]}
 `;

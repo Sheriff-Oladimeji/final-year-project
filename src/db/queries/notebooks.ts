@@ -81,6 +81,39 @@ export async function setNotebookSummary(
   return rows[0] ?? null;
 }
 
+// Repeatable claim — unlike claimNotebookSummarySlot above, this has no
+// "already done" condition, so it can be won again on every new material
+// upload. See regenerateTopicTaxonomy in src/actions/materials.ts.
+export async function claimTopicsExtractionSlot(id: string, userId: string): Promise<boolean> {
+  const rows = await db
+    .update(notebooks)
+    .set({ topicsExtracting: true })
+    .where(
+      and(
+        eq(notebooks.id, id),
+        eq(notebooks.userId, userId),
+        eq(notebooks.topicsExtracting, false),
+      ),
+    )
+    .returning({ id: notebooks.id });
+  return rows.length > 0;
+}
+
+// Always releases the mutex. Only stamps topicsExtractedAt when extractedAt
+// is non-null (a genuine successful pass) — a failed/aborted run leaves the
+// stamp untouched so the next upload's skip-check still triggers a retry
+// instead of falsely treating that content as already covered.
+export async function releaseTopicsExtractionSlot(
+  id: string,
+  userId: string,
+  extractedAt: Date | null,
+): Promise<void> {
+  await db
+    .update(notebooks)
+    .set(extractedAt ? { topicsExtracting: false, topicsExtractedAt: extractedAt } : { topicsExtracting: false })
+    .where(and(eq(notebooks.id, id), eq(notebooks.userId, userId)));
+}
+
 export async function touchNotebook(id: string, userId: string): Promise<void> {
   await db
     .update(notebooks)

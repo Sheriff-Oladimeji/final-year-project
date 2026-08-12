@@ -1,28 +1,16 @@
 /**
- * One-off backfill: seeds pre-existing notebooks with a topic taxonomy
- * extracted from their materials' own structure.
+ * One-off backfill: extracts topic taxonomies for pre-existing notebooks
+ * that won't otherwise receive another material upload (extraction now runs
+ * automatically on every upload via regenerateTopicTaxonomy — see
+ * src/lib/ai/topic-taxonomy.ts — so this script is only needed for
+ * notebooks whose material set is already final).
  *
- * Why this exists: regenerateNotebookSummary() (src/actions/materials.ts)
- * only extracts + seeds topics on a notebook's FIRST ready material, going
- * forward from when that code shipped. Every notebook created before then —
- * including live usability-study testers' notebooks — already has
- * `summary` set from the old two-field prompt, so claimNotebookSummarySlot
- * refuses to re-claim for them. Going through the normal action would
- * silently no-op for almost every existing notebook. This script bypasses
- * the claim-slot entirely and calls generateNotebookSummary() directly,
- * using ONLY the returned `topics` — it deliberately does NOT touch
- * `summary`/`suggestions`, since overwriting an already-reviewed,
- * currently-displayed summary mid-study is not something this script
- * should do.
- *
- * NOT gated on "notebook already has topic rows" — every actively-used
- * notebook already has at least one ad-hoc topic from the old free-form
- * classifier (that's precisely the merged-topic bug this backfill exists to
- * fix), so that guard would skip exactly the notebooks that need it most.
- * Re-running this script is safe (idempotent via getOrCreateTopic's
- * onConflictDoNothing — no duplicate rows) but wasteful (spends a Gemini
- * call per notebook again); it's a manual, occasionally-run script, not
- * something scheduled, so that tradeoff is fine.
+ * Thin wrapper around the real regenerateTopicTaxonomy() action, not a
+ * parallel reimplementation — that function's own claim-slot and
+ * "already current" skip-check make it safe to call directly for any
+ * notebook, old or new, so this script doesn't need its own dedup/quality
+ * logic. The store/ready-material checks below exist purely for readable
+ * per-notebook skip stats in the log output.
  *
  * Runs sequentially with a short delay between notebooks, not in parallel —
  * deliberately avoids reproducing the concurrent-Gemini/DB-pool exhaustion
@@ -53,8 +41,7 @@ async function main() {
   const { db } = await import("@/db");
   const { notebooks, materials } = await import("@/db/schema");
   const { eq, and, count } = await import("drizzle-orm");
-  const { generateNotebookSummary } = await import("@/lib/ai/suggestions");
-  const { getOrCreateTopic } = await import("@/db/queries/topics");
+  const { regenerateTopicTaxonomy } = await import("@/lib/ai/topic-taxonomy");
 
   const all = await db
     .select({
@@ -72,10 +59,10 @@ async function main() {
   }
 
   const stats = {
-    seeded: 0,
+    processed: 0,
     skippedNoStore: 0,
     skippedNoReadyMaterial: 0,
-    skippedThinExtraction: 0,
+    skippedAlreadyCurrent: 0,
     failed: 0,
   };
 
@@ -95,21 +82,18 @@ async function main() {
         continue;
       }
 
-      console.log(`[${nb.id}] "${nb.title}" — extracting taxonomy${DRY_RUN ? " (dry run)" : ""}...`);
-      if (DRY_RUN) continue;
-
-      const result = await generateNotebookSummary(nb.id, nb.title);
-      if (!result || result.topics.length < 3) {
-        console.warn(`  fewer than 3 usable topics extracted — skipping (material likely lacks clear structure)`);
-        stats.skippedThinExtraction++;
+      if (DRY_RUN) {
+        console.log(`[${nb.id}] "${nb.title}" — would extract (dry run)`);
         continue;
       }
 
-      for (const label of result.topics) {
-        await getOrCreateTopic(nb.userId, nb.id, label); // already normalized by generateNotebookSummary
+      const result = await regenerateTopicTaxonomy(nb.id, nb.userId);
+      if (!result.ran) {
+        stats.skippedAlreadyCurrent++;
+        continue;
       }
-      console.log(`  seeded ${result.topics.length} topics: ${result.topics.join(", ")}`);
-      stats.seeded++;
+      console.log(`[${nb.id}] "${nb.title}" — seeded ${result.labelsSeeded} topic label(s)`);
+      stats.processed++;
 
       // Gentle pacing between notebooks — sequential, not Promise.all.
       await new Promise((r) => setTimeout(r, 300));

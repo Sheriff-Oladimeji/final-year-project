@@ -53,7 +53,7 @@ export default async function DashboardPage() {
     sourceCountByNotebook.set(m.notebookId, (sourceCountByNotebook.get(m.notebookId) ?? 0) + 1);
   }
   // Topics are now pre-seeded from the material's own structure at upload
-  // time (see regenerateNotebookSummary in src/actions/materials.ts), so a
+  // time (see regenerateTopicTaxonomy in src/lib/ai/topic-taxonomy.ts), so a
   // brand-new notebook can have several topic rows before the student has
   // asked anything. Counting/averaging those would misleadingly read as
   // "assessed on N topics, scored zero" — only topics with a real
