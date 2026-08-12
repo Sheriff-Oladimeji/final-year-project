@@ -102,10 +102,16 @@ export default async function StudentInsightsPage({ params }: { params: Promise<
                           Score {topic.masteryScore}/100 · Updated {topic.updatedAt.toLocaleDateString()}
                         </p>
                       </div>
-                      <Badge variant="outline" className={cn("gap-1 text-xs", tierMeta.className)}>
-                        <TierIcon className="size-3" />
-                        {tierMeta.label} ({tierMeta.range})
-                      </Badge>
+                      {topic.hasInteracted ? (
+                        <Badge variant="outline" className={cn("gap-1 text-xs", tierMeta.className)}>
+                          <TierIcon className="size-3" />
+                          {tierMeta.label} ({tierMeta.range})
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                          Not yet studied
+                        </Badge>
+                      )}
                     </div>
 
                     {history.length > 0 && (

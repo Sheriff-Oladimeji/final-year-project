@@ -15,6 +15,7 @@ import {
   MATERIALS_PER_NOTEBOOK_CAP,
 } from "@/db/queries/materials";
 import { getNotebook, touchNotebook, setNotebookSummary, claimNotebookSummarySlot } from "@/db/queries/notebooks";
+import { getOrCreateTopic } from "@/db/queries/topics";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadDocumentToStore, deleteDocumentFromStore } from "@/lib/gemini/fileSearch";
 import { generateMaterialSuggestions, generateNotebookSummary } from "@/lib/ai/suggestions";
@@ -59,6 +60,17 @@ async function persistSuggestions(materialId: string, userId: string) {
 // callers wins it, the rest return false immediately with no extra query
 // or Gemini call. A slightly stale summary after adding a 2nd/3rd source is
 // an acceptable tradeoff for avoiding that load spike.
+//
+// Same one-shot-per-notebook limitation applies to the topic taxonomy seeded
+// below: since the slot only claims on a notebook's first ready material,
+// materials added afterward don't retroactively extend the taxonomy — new
+// concepts from later uploads fall back to CLASSIFY_TOPIC_TEMPLATE's
+// free-form path instead of the closed set. Most notebooks get their few
+// sources uploaded together before the first chat message, so this is
+// low-impact in practice, but it's a known gap, not a solved one. A proper
+// fix would gate re-extraction on "zero topic rows" instead of "summary is
+// null", feeding the existing labels back into the prompt so re-runs don't
+// duplicate them — scoped as a fast-follow, not this pass.
 async function regenerateNotebookSummary(notebookId: string, userId: string) {
   const claimed = await claimNotebookSummarySlot(notebookId, userId);
   if (!claimed) return;
@@ -68,6 +80,12 @@ async function regenerateNotebookSummary(notebookId: string, userId: string) {
   const result = await generateNotebookSummary(notebookId, nb.title);
   if (result) {
     await setNotebookSummary(notebookId, userId, result.summary, result.suggestions);
+    // Below 3 usable labels, the closed-set preference in CLASSIFY_TOPIC_TEMPLATE
+    // gives no real benefit over the free-form fallback — don't let one
+    // mediocre auto-generated label become "the" taxonomy for this notebook.
+    if (result.topics.length >= 3) {
+      await Promise.all(result.topics.map((label) => getOrCreateTopic(userId, notebookId, label)));
+    }
   }
 }
 

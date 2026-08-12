@@ -10,6 +10,7 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:migrate:drizzle": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
+    "topics:backfill": "tsx scripts/backfill-topic-taxonomy.ts",
     "eval:compile": "rm -rf evals/.compiled && tsc --module commonjs --target es2020 --moduleResolution node --esModuleInterop --skipLibCheck --outDir evals/.compiled src/lib/gemini/prompts.ts evals/prompts/gradeCheck.ts evals/prompts/classifyIntent.ts evals/prompts/explainFormat.ts",
     "eval:grading": "npm run eval:compile && cd evals && export GEMINI_API_KEY=$(grep '^GEMINI_API_KEY=' ../.env | cut -d '=' -f2-) PROMPTFOO_CONFIG_DIR=\"$(pwd)/.promptfoo-state\" && npx promptfoo@0.120.0 eval -c promptfooconfig.grading.yaml",
     "eval:intent": "npm run eval:compile && cd evals && export GEMINI_API_KEY=$(grep '^GEMINI_API_KEY=' ../.env | cut -d '=' -f2-) PROMPTFOO_CONFIG_DIR=\"$(pwd)/.promptfoo-state\" && npx promptfoo@0.120.0 eval -c promptfooconfig.intent.yaml",

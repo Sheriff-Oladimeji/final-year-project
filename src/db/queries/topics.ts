@@ -76,6 +76,10 @@ export interface TopicWithHistory {
   masteryScore: number;
   updatedAt: Date;
   tier: Tier;
+  // False for a topic pre-seeded from the material's own structure at
+  // upload time (see regenerateNotebookSummary) that the student hasn't
+  // asked about yet — distinguishes "not yet studied" from a genuine 0/100.
+  hasInteracted: boolean;
   recentHistory: ScoreHistoryEntry[];
 }
 
@@ -110,6 +114,7 @@ export async function listTopicsWithHistory(
       masteryScore: topic.masteryScore,
       updatedAt: topic.updatedAt,
       tier: getMasteryTier(topic.masteryScore),
+      hasInteracted: history.length > 0,
       recentHistory: history
         .filter((h) => h.correctness !== "unscored")
         .map((h) => ({

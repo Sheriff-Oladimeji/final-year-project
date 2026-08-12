@@ -7,7 +7,7 @@ import { Library } from "lucide-react";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { materials, topics } from "@/db/schema";
+import { materials, topics, interactions } from "@/db/schema";
 import { listNotebooks } from "@/db/queries/notebooks";
 import { NotebookGrid } from "@/components/notebooks/NotebookGrid";
 import { NewNotebookDialog } from "@/components/notebooks/NewNotebookDialog";
@@ -28,27 +28,40 @@ export default async function DashboardPage() {
     updated_at: n.updatedAt.toISOString(),
   }));
 
-  // Tally stats per notebook in two batched queries.
-  const [materialCounts, topicRows] = await Promise.all([
+  // Tally stats per notebook in batched queries.
+  const [materialCounts, topicRows, interactedTopicIds] = await Promise.all([
     db
       .select({ notebookId: materials.notebookId, id: materials.id })
       .from(materials)
       .where(eq(materials.userId, session.user.id)),
     db
       .select({
+        id: topics.id,
         notebookId: topics.notebookId,
         masteryScore: topics.masteryScore,
       })
       .from(topics)
       .where(eq(topics.userId, session.user.id)),
+    db
+      .selectDistinct({ topicId: interactions.topicId })
+      .from(interactions)
+      .where(eq(interactions.userId, session.user.id)),
   ]);
 
   const sourceCountByNotebook = new Map<string, number>();
   for (const m of materialCounts) {
     sourceCountByNotebook.set(m.notebookId, (sourceCountByNotebook.get(m.notebookId) ?? 0) + 1);
   }
+  // Topics are now pre-seeded from the material's own structure at upload
+  // time (see regenerateNotebookSummary in src/actions/materials.ts), so a
+  // brand-new notebook can have several topic rows before the student has
+  // asked anything. Counting/averaging those would misleadingly read as
+  // "assessed on N topics, scored zero" — only topics with a real
+  // interaction count toward the dashboard stats.
+  const interactedSet = new Set(interactedTopicIds.map((r) => r.topicId));
   const topicStatsByNotebook = new Map<string, { count: number; total: number }>();
   for (const t of topicRows) {
+    if (!interactedSet.has(t.id)) continue;
     const cur = topicStatsByNotebook.get(t.notebookId) ?? { count: 0, total: 0 };
     cur.count += 1;
     cur.total += t.masteryScore;

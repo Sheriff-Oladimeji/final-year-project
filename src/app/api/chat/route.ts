@@ -41,6 +41,7 @@ import { topics } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getMasteryTier, scoreDelta, clipScore } from "@/lib/mastery";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { normalizeTopicLabel } from "@/lib/topics";
 import type { Correctness } from "@/types";
 
 export const maxDuration = 60;
@@ -466,8 +467,7 @@ export async function POST(req: Request) {
         providerOptions: NO_THINKING,
       });
 
-      let topicLabel = topicGen.text.toLowerCase().trim().replace(/\.$/, "");
-      if (topicLabel.length > 100) topicLabel = topicLabel.slice(0, 100);
+      const topicLabel = normalizeTopicLabel(topicGen.text);
 
       const topic = await getOrCreateTopic(userId, notebookId, topicLabel);
       const tier = getMasteryTier(topic.masteryScore);

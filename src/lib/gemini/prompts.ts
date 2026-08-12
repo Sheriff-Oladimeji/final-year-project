@@ -168,7 +168,7 @@ export const CLASSIFY_TOPIC_TEMPLATE = (
 You are classifying a student question by topic.
 
 Question: ${question}
-${recentTopics.length > 0 ? `\nTopics this student has already studied in this notebook:\n${recentTopics.map((t) => `- ${t}`).join("\n")}\n\nIf this question is a natural follow-up to one of those topics, reuse its exact label. Only invent a new label when the question is clearly about something different.` : ""}
+${recentTopics.length > 0 ? `\nExisting topics for this notebook:\n${recentTopics.map((t) => `- ${t}`).join("\n")}\n\nChoose the SINGLE closest-matching label from this list if the question is genuinely about one of them, even if loosely phrased — reuse its exact text, do not paraphrase it. Only invent a new label if the question is about a concept not covered by ANY label above — a different concept, not just a different phrasing of one already listed. When in doubt, prefer reusing — but never force-fit a question into a label that's actually about something else.` : ""}
 
 Reply with only a short topic label of 2 to 5 words (e.g. "binary search trees",
 "TCP/IP model", "merge sort complexity"). No punctuation. No explanation.
@@ -560,6 +560,18 @@ Use file_search across ALL the course materials in this notebook and produce:
      different angles (a definition, a mechanism, an application, a
      trade-off) — vary them, don't all ask "what is X?".
 
+3. TOPICS — extract 5 to 15 canonical topic labels from the material's own
+   structure (its actual headings, sections, and chapters — not invented
+   groupings). Each label 2 to 5 words, same style as e.g. "binary search
+   trees" or "TCP/IP model" — no numbering, no punctuation. These become
+   the fixed set of gradable topics for this notebook, so:
+   - One label per genuinely distinct concept/section — do not split one
+     section into multiple near-duplicate labels, and do not merge two
+     clearly separate sections into one label.
+   - Use the material's own terminology, not a paraphrase.
+   - If the material has no clear internal structure (no headings/sections
+     you can point to), return an empty array rather than guessing.
+
 Reply with ONLY this JSON object, no other text, no markdown fences:
-{"summary": "...", "suggestions": ["...", "...", "..."]}
+{"summary": "...", "suggestions": ["...", "...", "..."], "topics": ["...", "..."]}
 `;
