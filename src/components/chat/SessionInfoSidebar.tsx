@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AlertCircle, HelpCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,11 @@ interface SessionInfoSidebarProps {
   notebookTitle: string;
   sourceCount: number;
   topics: NotebookTopicStatus[];
+  // Distinguishes "nothing extracted yet, still running" from "genuinely
+  // idle" — without this the empty state reads as if the notebook has no
+  // topics at all during the (up to several seconds) window right after
+  // upload while taxonomy extraction is still in flight.
+  topicsExtracting: boolean;
   currentTopicName: string | null;
   recentCorrectness: Correctness[];
   mobileOpen?: boolean;
@@ -69,6 +75,7 @@ export function SessionInfoSidebar({
   notebookTitle,
   sourceCount,
   topics,
+  topicsExtracting,
   currentTopicName,
   recentCorrectness,
   mobileOpen = false,
@@ -99,6 +106,15 @@ export function SessionInfoSidebar({
           <div className="mt-3 flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto">
             {topics.map((t) => (
               <TopicRow key={t.id} topic={t} isCurrent={t.name === currentTopicName} />
+            ))}
+          </div>
+        ) : topicsExtracting ? (
+          <div className="mt-3 flex flex-col gap-2" aria-label="Extracting topics">
+            {[100, 85, 92].map((w, i) => (
+              <div key={i} className="rounded-lg border border-border p-2.5">
+                <Skeleton className="h-3" style={{ width: `${w}%` }} />
+                <Skeleton className="mt-2 h-1.5 w-full" />
+              </div>
             ))}
           </div>
         ) : (

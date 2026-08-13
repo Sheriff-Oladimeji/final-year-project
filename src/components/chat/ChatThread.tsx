@@ -89,6 +89,12 @@ export function ChatThread({
 
   const readyCount = materials.filter((m) => m.status === "ready").length;
   const noReadySources = readyCount === 0;
+  // A source can be "ready" while the notebook's own summary/taxonomy are
+  // still being prepared in the background — asking a question in that
+  // window is premature, so the input stays disabled until both land, not
+  // just until the first source finishes indexing.
+  const stillSettingUp = !noReadySources && (notebook.summary === null || topicsExtracting);
+  const inputDisabled = noReadySources || stillSettingUp;
 
   const { messages, sendMessage, status, error } = useChat<ChatMessage>({
     messages: initialMessages,
@@ -156,7 +162,7 @@ export function ChatThread({
 
   function send(userText: string) {
     const trimmed = userText.trim();
-    if (!trimmed || noReadySources) return;
+    if (!trimmed || inputDisabled) return;
     sendMessage(
       { text: trimmed },
       { body: { notebookId: notebook.id, interactionId: interactionId ?? undefined } },
@@ -236,7 +242,7 @@ export function ChatThread({
                 // (regenerateNotebookSummary) hasn't landed yet — SourcesPanel
                 // keeps polling until notebook.summary is set, which swaps
                 // this skeleton for the real content automatically.
-                <div className="w-full max-w-xl space-y-4 text-left" aria-label="Generating notebook summary">
+                <div className="w-full max-w-xl space-y-4 text-left mt-6" aria-label="Generating notebook summary">
                   <div className="flex items-center gap-1.5 text-primary">
                     <Sparkles className="size-3.5 animate-pulse" />
                     <span className="text-xs font-medium tracking-wide uppercase">
@@ -300,23 +306,25 @@ export function ChatThread({
           <PromptInputTextarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            disabled={noReadySources}
+            disabled={inputDisabled}
             placeholder={
               noReadySources
                 ? "Add a source first to start chatting…"
-                : interactionId
-                  ? "Answer the Quick check, or ask something else…"
-                  : `Ask anything about ${notebook.title}…`
+                : stillSettingUp
+                  ? "Getting your notebook ready…"
+                  : interactionId
+                    ? "Answer the Quick check, or ask something else…"
+                    : `Ask anything about ${notebook.title}…`
             }
           />
         </PromptInputBody>
         <PromptInputFooter>
           <span className="text-xs text-muted-foreground">
-            Enter to send · Shift+Enter for new line
+            {stillSettingUp ? "Just a moment…" : "Enter to send · Shift+Enter for new line"}
           </span>
           <PromptInputSubmit
             status={submitStatus}
-            disabled={!text.trim() || noReadySources}
+            disabled={!text.trim() || inputDisabled}
           />
         </PromptInputFooter>
       </PromptInput>
@@ -326,6 +334,7 @@ export function ChatThread({
         notebookTitle={notebook.title}
         sourceCount={materials.length}
         topics={sidebarTopics}
+        topicsExtracting={topicsExtracting}
         currentTopicName={topicName}
         recentCorrectness={recentCorrectness}
         mobileOpen={mobileMasteryOpen}
