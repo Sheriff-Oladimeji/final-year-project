@@ -111,52 +111,68 @@ export function ChatThread({
     },
   });
 
-  const { topicName, masteryScore, tier, recentCorrectness } = useMemo(() => {
-    let topicName: string | null = null;
-    let masteryScore: number | null = null;
-    let tier: Tier | null = null;
+  // Tracks EVERY topic touched this session, not just the most recent one —
+  // a Map keyed by topic name, insertion-ordered oldest-first, so a topic
+  // that was advanced past earlier in the conversation keeps its live
+  // score/tier instead of reverting to the page-load snapshot (which
+  // predates this session's interactions and would show it as untouched).
+  const { currentTopicName, liveTopics, recentCorrectness } = useMemo(() => {
+    let currentTopicName: string | null = null;
+    const liveTopics = new Map<string, { mastery_score: number; tier: Tier }>();
     const recent: (Correctness | "give_up")[] = [];
 
     for (const m of messages) {
       if (m.role !== "assistant") continue;
       for (const part of m.parts) {
         if (part.type === "data-topic") {
-          topicName = part.data.name;
-          masteryScore = part.data.mastery_score;
-          tier = part.data.tier;
+          currentTopicName = part.data.name;
+          liveTopics.set(part.data.name, { mastery_score: part.data.mastery_score, tier: part.data.tier });
         } else if (part.type === "data-score") {
-          masteryScore = part.data.new_score;
-          tier = part.data.new_tier;
+          // Scoped by the event's own topic_name, NOT currentTopicName — on
+          // an advance turn, "topic" (above) already announced the NEXT
+          // topic while this score still reports the PREVIOUS one's result;
+          // keying off currentTopicName here would overwrite the new
+          // topic's fresh 0 score with the old topic's final score, and
+          // leave the old topic's row stuck at whatever it was before it
+          // was mastered.
+          if (part.data.topic_name) {
+            liveTopics.set(part.data.topic_name, { mastery_score: part.data.new_score, tier: part.data.new_tier });
+          }
           recent.push(part.data.correctness);
         }
       }
     }
     const recentCorrectness = recent.filter((c): c is Correctness => c !== "give_up");
-    return { topicName, masteryScore, tier, recentCorrectness };
+    return { currentTopicName, liveTopics, recentCorrectness };
   }, [messages]);
 
-  // Merges the server-fetched notebook topic list with whatever's currently
-  // live in this conversation (from the useMemo above, updated in real time
-  // via streamed data-topic/data-score parts) — so the active topic's
-  // row reflects its freshest score/tier without a full page refetch, and a
+  // Merges the server-fetched notebook topic list with every topic that's
+  // gone live in this conversation (from the useMemo above, updated in real
+  // time via streamed data-topic/data-score parts) — so each topic's row
+  // reflects its freshest score/tier without a full page refetch, and a
   // topic classified ad hoc mid-session (not in the server snapshot) still
-  // shows up rather than being silently dropped. The topic being worked on
-  // right now is pinned to the front of the list rather than left wherever
-  // its taxonomy/insertion order placed it — that's the one the student
-  // actually wants to see first.
+  // shows up rather than being silently dropped. Topics touched this
+  // session are ordered most-recently-touched-first (current topic pinned
+  // to the very front), ahead of topics only known from the initial
+  // snapshot — that matches what the student actually wants to see first.
   const sidebarTopics = useMemo((): NotebookTopicStatus[] => {
-    if (!topicName) return notebookTopics;
-    const idx = notebookTopics.findIndex((t) => t.name === topicName);
-    const liveRow: NotebookTopicStatus = {
-      id: idx === -1 ? `live-${topicName}` : notebookTopics[idx].id,
-      name: topicName,
-      mastery_score: masteryScore ?? 0,
-      tier: tier ?? "recall",
-      has_interacted: true,
-    };
-    const rest = idx === -1 ? notebookTopics : notebookTopics.filter((_, i) => i !== idx);
-    return [liveRow, ...rest];
-  }, [notebookTopics, topicName, masteryScore, tier]);
+    if (liveTopics.size === 0) return notebookTopics;
+    const byName = new Map(notebookTopics.map((t) => [t.name, t]));
+    const liveNamesNewestFirst = [...liveTopics.keys()].reverse();
+    const liveRows: NotebookTopicStatus[] = liveNamesNewestFirst.map((name) => {
+      const live = liveTopics.get(name)!;
+      const existing = byName.get(name);
+      return {
+        id: existing?.id ?? `live-${name}`,
+        name,
+        mastery_score: live.mastery_score,
+        tier: live.tier,
+        has_interacted: true,
+      };
+    });
+    const rest = notebookTopics.filter((t) => !liveTopics.has(t.name));
+    return [...liveRows, ...rest];
+  }, [notebookTopics, liveTopics]);
 
   const startTopics = notebookTopics.filter((t) => !t.has_interacted).slice(0, 3);
 
@@ -335,7 +351,7 @@ export function ChatThread({
         sourceCount={materials.length}
         topics={sidebarTopics}
         topicsExtracting={topicsExtracting}
-        currentTopicName={topicName}
+        currentTopicName={currentTopicName}
         recentCorrectness={recentCorrectness}
         mobileOpen={mobileMasteryOpen}
         onMobileClose={onMobileMasteryClose}

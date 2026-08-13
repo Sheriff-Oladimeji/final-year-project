@@ -43,8 +43,19 @@ export function interactionsToUIMessages(
     // ── Assistant turn ────────────────────────────────────────────────
     const assistantParts: ChatMessage["parts"] = [];
 
-    // Score badge if continuing a chain and the prior reply was scored.
-    if (!isNewChain && prev && prev.correctness !== "unscored") {
+    // Score badge if the prior reply was scored AND this row is a genuine
+    // continuation of it — either same-topic reinforcement (topicId
+    // unchanged) or an advance to the next topic right after mastering the
+    // previous one (promptTemplate === "advance", topicId differs). Plain
+    // `!isNewChain` used to gate this, but isNewChain is also true on an
+    // advance turn (the question text changes), which wrongly hid the
+    // score badge on exactly the turn that matters most — right after the
+    // student masters a topic and moves on. Excluding a genuinely
+    // unrelated new topic (fresh new_question classification) still works:
+    // that row's topicId differs AND its promptTemplate isn't "advance".
+    const isScoredContinuation = it.topicId === prev?.topicId || it.promptTemplate === "advance";
+    if (prev && prev.correctness !== "unscored" && isScoredContinuation) {
+      const prevTopic = topics.get(prev.topicId);
       const before = runningScore.get(prev.topicId) ?? 0;
       const after = clipScore(before + prev.scoreDelta);
       runningScore.set(prev.topicId, after);
@@ -53,6 +64,7 @@ export function interactionsToUIMessages(
         type: "data-score",
         id: `score-${it.id}`,
         data: {
+          topic_name: prevTopic?.name ?? "",
           correctness: prev.correctness as Correctness | "give_up",
           score_delta: prev.scoreDelta,
           new_score: after,

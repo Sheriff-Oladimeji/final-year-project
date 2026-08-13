@@ -310,7 +310,7 @@ export async function POST(req: Request) {
 
         writer.write({ type: "data-mode", id: "mode", data: { value: "answer" } });
         writer.write({ type: "data-topic", id: "topic", data: { name: topic.name, mastery_score: newScore, tier: newTier } });
-        writer.write({ type: "data-score", id: "score", data: { correctness: "give_up", score_delta: scoreDelta("give_up"), new_score: newScore, new_tier: newTier } });
+        writer.write({ type: "data-score", id: "score", data: { topic_name: topic.name, correctness: "give_up", score_delta: scoreDelta("give_up"), new_score: newScore, new_tier: newTier } });
         writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
         return;
@@ -409,7 +409,7 @@ export async function POST(req: Request) {
 
         writer.write({ type: "data-mode", id: "mode", data: { value: "guide" } });
         writer.write({ type: "data-topic", id: "topic", data: { name: targetTopic.name, mastery_score: targetScore, tier: targetTier } });
-        writer.write({ type: "data-score", id: "score", data: { correctness, score_delta: delta, new_score: newScore, new_tier: newTier } });
+        writer.write({ type: "data-score", id: "score", data: { topic_name: topic.name, correctness, score_delta: delta, new_score: newScore, new_tier: newTier } });
         writer.write({ type: "data-sources", id: "sources", data: { items: sourceItems } });
         writer.write({ type: "data-interaction", id: "interaction", data: { id: next.id } });
         return;
