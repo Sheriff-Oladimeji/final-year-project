@@ -118,7 +118,7 @@ export function ChatThread({
   // predates this session's interactions and would show it as untouched).
   const { currentTopicName, liveTopics, recentCorrectness } = useMemo(() => {
     let currentTopicName: string | null = null;
-    const liveTopics = new Map<string, { mastery_score: number; tier: Tier }>();
+    const liveTopics = new Map<string, { mastery_score: number; tier: Tier; completed: boolean }>();
     const recent: (Correctness | "give_up")[] = [];
 
     for (const m of messages) {
@@ -126,7 +126,9 @@ export function ChatThread({
       for (const part of m.parts) {
         if (part.type === "data-topic") {
           currentTopicName = part.data.name;
-          liveTopics.set(part.data.name, { mastery_score: part.data.mastery_score, tier: part.data.tier });
+          // A fresh "topic" event means this topic is active again (first
+          // time, or revisited) — not completed until it's scored correct.
+          liveTopics.set(part.data.name, { mastery_score: part.data.mastery_score, tier: part.data.tier, completed: false });
         } else if (part.type === "data-score") {
           // Scoped by the event's own topic_name, NOT currentTopicName — on
           // an advance turn, "topic" (above) already announced the NEXT
@@ -136,7 +138,11 @@ export function ChatThread({
           // leave the old topic's row stuck at whatever it was before it
           // was mastered.
           if (part.data.topic_name) {
-            liveTopics.set(part.data.topic_name, { mastery_score: part.data.new_score, tier: part.data.new_tier });
+            liveTopics.set(part.data.topic_name, {
+              mastery_score: part.data.new_score,
+              tier: part.data.new_tier,
+              completed: part.data.correctness === "correct",
+            });
           }
           recent.push(part.data.correctness);
         }
@@ -165,8 +171,16 @@ export function ChatThread({
       return {
         id: existing?.id ?? `live-${name}`,
         name,
-        mastery_score: live.mastery_score,
-        tier: live.tier,
+        // A topic that was correctly finished and left behind shows as
+        // fully done. The raw internal mastery_score (e.g. 15 after a
+        // single correct answer) is designed to accrue gradually across
+        // many questions, but advancement now happens after just one
+        // correct answer — so the raw number would read as "barely
+        // started" right after the tutor said "you've got a solid handle
+        // on this." Only the student-facing bar is affected; the real
+        // score in the DB (used for admin/thesis analytics) is untouched.
+        mastery_score: live.completed ? 100 : live.mastery_score,
+        tier: live.completed ? "analysis" : live.tier,
         has_interacted: true,
       };
     });

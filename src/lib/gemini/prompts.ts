@@ -395,6 +395,74 @@ Quick check: [your question]
 ${buildQuickCheckRules(tier, "you introduced in this response")}
 `;
 
+// ── After an incorrect answer — correct the specific mistake, stay put ─────
+// Previously this branch reused DIRECT_ANSWER_TEMPLATE (built for a fresh,
+// unrelated question) — it never told the model the student had just gotten
+// something wrong, so it had no correctness framing to work from. Result:
+// the model would sometimes praise a wrong answer as if it were right, and
+// wander into an adjacent subtopic instead of fixing the specific gap the
+// Quick check exposed. This template exists so "incorrect" gets the same
+// dedicated, correctness-aware treatment "correct"/"correct_with_hint"
+// already get from AFTER_CORRECT_TEMPLATE above.
+
+export const AFTER_INCORRECT_TEMPLATE = (
+  originalQuestion: string,
+  studentAnswer: string,
+  topic: string,
+  conversation: string,
+  notebookTitle: string,
+  tier: "recall" | "application" | "analysis",
+) => `\
+You are a smart AI tutor for "${notebookTitle}".
+The student just answered a Quick check INCORRECTLY — their understanding
+of this specific point is wrong or missing. Search the course materials
+and ground your response ONLY in what you find there. Never invent facts.
+
+Original question: ${originalQuestion}
+Student's (incorrect) answer: ${studentAnswer}
+Topic: ${topic} | Mastery tier: ${tier}
+${conversation ? `\nConversation so far (this includes the Quick check they just missed):\n${conversation}\n` : ""}
+
+━━━ YOUR TASK — CORRECT THE SPECIFIC MISTAKE, NOTHING ELSE ━━━
+Never imply, praise, or hedge as if the answer were right or partially
+right — it wasn't. No "Great effort!", no "You're close!" unless the
+answer is genuinely and specifically close.
+
+Stay narrowly on the ONE concept the Quick check tested. Do NOT pivot to a
+broader or adjacent subtopic, a new section, or "let's also look at X" —
+introducing new material right when the student is confused about the
+current point is its own failure mode, just as bad as failing to correct
+them. Every sentence below must relate directly to the concept just tested,
+not the topic in general.
+
+Write in this shape:
+1. FIRST, before anything else: one sentence naming exactly what's wrong
+   with THEIR specific answer — not just a restatement of the right answer
+   next to it, but what makes their reasoning incorrect.
+   GOOD: "Not quite — you have it backwards: **distributed** is what
+   spreads data across multiple physical locations; **parallel** is
+   multiple processors working on the same database. Speed isn't the
+   distinguishing factor, location is."
+   BAD: "You've nailed the distinctions! Now, let's look at System
+   Architectures..." — treats a wrong answer as correct and changes the
+   subject instead of correcting it.
+   BAD: "The correct answer is X." — states the right answer without ever
+   identifying what was wrong with what THEY said, so the student can't
+   see where their own reasoning broke.
+2. THEN give the correct answer directly, with the key term in **bold**.
+
+${buildFormattingRules()}
+
+━━━ QUICK CHECK ━━━
+After one blank line, write exactly:
+Quick check: [your question]
+
+${buildQuickCheckRules(tier, "you just corrected above")}
+This question must re-test the SAME concept they just got wrong — a more
+direct or simpler phrasing of it, not a new angle and not a different
+concept. Do not move on until they can answer this one.
+`;
+
 // ── Advancing to the next concept after mastery is confirmed ───────────────
 // "What's next" used to be decided by asking Gemini to re-read the material's
 // structure fresh each time (NEXT_CONCEPT_TEMPLATE, retired) — replaced with

@@ -14,6 +14,7 @@ import {
   CLASSIFY_TOPIC_TEMPLATE,
   DIRECT_ANSWER_TEMPLATE,
   AFTER_CORRECT_TEMPLATE,
+  AFTER_INCORRECT_TEMPLATE,
   ADVANCE_TEMPLATE,
   MASTERY_COMPLETE_TEMPLATE,
   REVEAL_TEMPLATE,
@@ -356,8 +357,8 @@ export async function POST(req: Request) {
               getMasteryTier(advanceTopic.masteryScore),
             )
           : !isCorrect
-            ? DIRECT_ANSWER_TEMPLATE(
-                interaction.question, topic.name, conversation, notebookTitle, newTier,
+            ? AFTER_INCORRECT_TEMPLATE(
+                interaction.question, userText, topic.name, conversation, notebookTitle, newTier,
               )
             : correctness === "correct"
               ? MASTERY_COMPLETE_TEMPLATE(topic.name, notebookTitle)
