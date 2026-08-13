@@ -26,6 +26,11 @@ interface SessionInfoSidebarProps {
   topicsExtracting: boolean;
   currentTopicName: string | null;
   recentCorrectness: Correctness[];
+  // Populates the chat input with a topic-scoped prompt (e.g. "Teach me X"
+  // or "Quiz me on X again") WITHOUT sending it — the student can edit it
+  // before hitting send themselves. Omitted while a topic taxonomy hasn't
+  // loaded yet (no rows to act on).
+  onTopicAction?: (topic: NotebookTopicStatus) => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
@@ -50,7 +55,15 @@ const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }>
   incorrect: { className: "bg-red-500", title: "Incorrect" },
 };
 
-function TopicRow({ topic, isCurrent }: { topic: NotebookTopicStatus; isCurrent: boolean }) {
+function TopicRow({
+  topic,
+  isCurrent,
+  onAction,
+}: {
+  topic: NotebookTopicStatus;
+  isCurrent: boolean;
+  onAction?: (topic: NotebookTopicStatus) => void;
+}) {
   const barClass = topic.has_interacted ? TIER_BAR_CLASS[topic.tier] : NOT_STARTED_BAR_CLASS;
   return (
     <div
@@ -59,7 +72,18 @@ function TopicRow({ topic, isCurrent }: { topic: NotebookTopicStatus; isCurrent:
         isCurrent ? "border-primary/40 bg-primary/5" : "border-border bg-transparent",
       )}
     >
-      <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
+        {onAction && (
+          <button
+            type="button"
+            onClick={() => onAction(topic)}
+            className="shrink-0 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          >
+            {topic.has_interacted ? "Recall" : "Learn"}
+          </button>
+        )}
+      </div>
       {/* No number rendered anywhere in this row — the bar's fill and color
           are the only signal, deliberately not paired with a digit, a text
           badge, or a title tooltip. */}
@@ -78,6 +102,7 @@ export function SessionInfoSidebar({
   topicsExtracting,
   currentTopicName,
   recentCorrectness,
+  onTopicAction,
   mobileOpen = false,
   onMobileClose,
 }: SessionInfoSidebarProps) {
@@ -105,7 +130,7 @@ export function SessionInfoSidebar({
         {topics.length > 0 ? (
           <div className="mt-3 flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto">
             {topics.map((t) => (
-              <TopicRow key={t.id} topic={t} isCurrent={t.name === currentTopicName} />
+              <TopicRow key={t.id} topic={t} isCurrent={t.name === currentTopicName} onAction={onTopicAction} />
             ))}
           </div>
         ) : topicsExtracting ? (

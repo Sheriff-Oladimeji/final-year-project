@@ -204,6 +204,16 @@ export function ChatThread({
     if (message.text) send(message.text);
   }
 
+  // Fills the input with a topic-scoped prompt but does NOT send it — the
+  // student reviews/edits it before hitting send themselves. A topic
+  // that's already been interacted with gets a review-style prompt rather
+  // than "Teach me X" again, since it's not being introduced for the
+  // first time.
+  function setTopicPrompt(topic: NotebookTopicStatus) {
+    const label = capitalize(topic.name);
+    setText(topic.has_interacted ? `Quiz me on ${label} again` : `Teach me ${label}`);
+  }
+
   const submitStatus =
     status === "submitted" || status === "streaming"
       ? (status as "submitted" | "streaming")
@@ -367,6 +377,7 @@ export function ChatThread({
         topicsExtracting={topicsExtracting}
         currentTopicName={currentTopicName}
         recentCorrectness={recentCorrectness}
+        onTopicAction={inputDisabled ? undefined : setTopicPrompt}
         mobileOpen={mobileMasteryOpen}
         onMobileClose={onMobileMasteryClose}
       />
