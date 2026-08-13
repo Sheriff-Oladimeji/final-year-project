@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull } from "drizzle-orm";
+import { eq, and, or, desc, isNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { notebooks } from "@/db/schema";
 import type { Notebook } from "@/db/schema";
@@ -71,38 +71,53 @@ export async function setNotebookSummary(
   id: string,
   userId: string,
   summary: string,
-  suggestions: string[],
 ): Promise<Notebook | null> {
   const rows = await db
     .update(notebooks)
-    .set({ summary, starterSuggestions: suggestions, updatedAt: new Date() })
+    .set({ summary, updatedAt: new Date() })
     .where(and(eq(notebooks.id, id), eq(notebooks.userId, userId)))
     .returning();
   return rows[0] ?? null;
 }
 
+// How long a claim is honored before it's treated as abandoned (crashed
+// process, deploy restart, execution-time limit hit mid-drain-loop) and a
+// later caller is allowed to reclaim it. Generous relative to how long a
+// real drain loop takes, so it never fires against a genuinely in-progress
+// run — it exists purely to recover from the mutex holder never reaching
+// its own finally block.
+const STALE_CLAIM_MS = 10 * 60 * 1000;
+
 // Repeatable claim — unlike claimNotebookSummarySlot above, this has no
 // "already done" condition, so it can be won again on every new material
-// upload. See regenerateTopicTaxonomy in src/actions/materials.ts.
+// upload. Also self-heals: a claim older than STALE_CLAIM_MS is treated as
+// abandoned and can be reclaimed, since nothing else ever resets
+// topicsExtracting back to false if the holder crashes before its finally
+// block runs. See regenerateTopicTaxonomy in src/lib/ai/topic-taxonomy.ts.
 export async function claimTopicsExtractionSlot(id: string, userId: string): Promise<boolean> {
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS);
   const rows = await db
     .update(notebooks)
-    .set({ topicsExtracting: true })
+    .set({ topicsExtracting: true, topicsExtractionClaimedAt: new Date() })
     .where(
       and(
         eq(notebooks.id, id),
         eq(notebooks.userId, userId),
-        eq(notebooks.topicsExtracting, false),
+        or(
+          eq(notebooks.topicsExtracting, false),
+          lt(notebooks.topicsExtractionClaimedAt, staleBefore),
+        ),
       ),
     )
     .returning({ id: notebooks.id });
   return rows.length > 0;
 }
 
-// Always releases the mutex. Only stamps topicsExtractedAt when extractedAt
-// is non-null (a genuine successful pass) — a failed/aborted run leaves the
-// stamp untouched so the next upload's skip-check still triggers a retry
-// instead of falsely treating that content as already covered.
+// Always releases the mutex (and clears the claim timestamp). Only stamps
+// topicsExtractedAt when extractedAt is non-null (a genuine successful
+// pass) — a failed/aborted run leaves the stamp untouched so the next
+// upload's skip-check still triggers a retry instead of falsely treating
+// that content as already covered.
 export async function releaseTopicsExtractionSlot(
   id: string,
   userId: string,
@@ -110,7 +125,11 @@ export async function releaseTopicsExtractionSlot(
 ): Promise<void> {
   await db
     .update(notebooks)
-    .set(extractedAt ? { topicsExtracting: false, topicsExtractedAt: extractedAt } : { topicsExtracting: false })
+    .set(
+      extractedAt
+        ? { topicsExtracting: false, topicsExtractionClaimedAt: null, topicsExtractedAt: extractedAt }
+        : { topicsExtracting: false, topicsExtractionClaimedAt: null },
+    )
     .where(and(eq(notebooks.id, id), eq(notebooks.userId, userId)));
 }
 

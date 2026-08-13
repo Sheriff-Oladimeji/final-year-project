@@ -70,9 +70,9 @@ async function regenerateNotebookSummary(notebookId: string, userId: string) {
 
   const nb = await getNotebook(notebookId, userId);
   if (!nb) return;
-  const result = await generateNotebookSummary(notebookId, nb.title);
-  if (result) {
-    await setNotebookSummary(notebookId, userId, result.summary, result.suggestions);
+  const summary = await generateNotebookSummary(notebookId, nb.title);
+  if (summary) {
+    await setNotebookSummary(notebookId, userId, summary);
   }
 }
 
@@ -129,7 +129,17 @@ export async function uploadMaterialAction(formData: FormData) {
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
       await regenerateNotebookSummary(notebookId, userId);
-      await regenerateTopicTaxonomy(notebookId, userId);
+      // Own try/catch, deliberately not left to the outer one: the material
+      // above is already committed "ready" and genuinely indexed at this
+      // point. A transient failure here (e.g. a DB hiccup under batch-upload
+      // load) must not fall through to the outer catch and flip this
+      // material back to "failed" — that would hide a working, indexed
+      // material from the student over an unrelated taxonomy error.
+      try {
+        await regenerateTopicTaxonomy(notebookId, userId);
+      } catch (err) {
+        console.error("[regenerateTopicTaxonomy] failed, material stays ready:", err);
+      }
     } catch (err) {
       console.error("[uploadMaterialAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");
@@ -190,7 +200,17 @@ export async function submitYoutubeAction(formData: FormData) {
       await touchNotebook(notebookId, userId);
       await persistSuggestions(materialId, userId);
       await regenerateNotebookSummary(notebookId, userId);
-      await regenerateTopicTaxonomy(notebookId, userId);
+      // Own try/catch, deliberately not left to the outer one: the material
+      // above is already committed "ready" and genuinely indexed at this
+      // point. A transient failure here (e.g. a DB hiccup under batch-upload
+      // load) must not fall through to the outer catch and flip this
+      // material back to "failed" — that would hide a working, indexed
+      // material from the student over an unrelated taxonomy error.
+      try {
+        await regenerateTopicTaxonomy(notebookId, userId);
+      } catch (err) {
+        console.error("[regenerateTopicTaxonomy] failed, material stays ready:", err);
+      }
     } catch (err) {
       console.error("[submitYoutubeAction] after() failed:", err);
       await setMaterialStatus(materialId, "failed");

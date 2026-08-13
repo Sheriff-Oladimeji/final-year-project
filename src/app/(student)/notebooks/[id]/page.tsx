@@ -5,16 +5,14 @@ export const maxDuration = 300;
 
 import { redirect, notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
-import { db } from "@/db";
-import { topics } from "@/db/schema";
 import { getNotebook } from "@/db/queries/notebooks";
 import { listMaterialsByNotebook } from "@/db/queries/materials";
 import { listInteractionsByNotebook } from "@/db/queries/interactions";
+import { listNotebookTopicsWithStatus } from "@/db/queries/topics";
 import { interactionsToUIMessages, type TopicSnapshot } from "@/lib/ai/history";
 import { NotebookDetail } from "@/components/notebooks/NotebookDetail";
-import type { Notebook, Material } from "@/types";
+import type { Notebook, Material, NotebookTopicStatus } from "@/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -33,18 +31,14 @@ export default async function NotebookPage({ params }: PageProps) {
     user_id: rawNotebook.userId,
     title: rawNotebook.title,
     summary: rawNotebook.summary,
-    starter_suggestions: rawNotebook.starterSuggestions ?? [],
     created_at: rawNotebook.createdAt.toISOString(),
     updated_at: rawNotebook.updatedAt.toISOString(),
   };
 
-  const [rawMaterials, interactions, topicRows] = await Promise.all([
+  const [rawMaterials, interactions, notebookTopicsRaw] = await Promise.all([
     listMaterialsByNotebook(session.user.id, id),
     listInteractionsByNotebook(session.user.id, id),
-    db
-      .select({ id: topics.id, name: topics.name })
-      .from(topics)
-      .where(and(eq(topics.userId, session.user.id), eq(topics.notebookId, id))),
+    listNotebookTopicsWithStatus(session.user.id, id),
   ]);
 
   const materials: Material[] = rawMaterials.map((m) => ({
@@ -60,8 +54,16 @@ export default async function NotebookPage({ params }: PageProps) {
     suggestions: m.suggestions ?? [],
   }));
 
+  const notebookTopics: NotebookTopicStatus[] = notebookTopicsRaw.map((t) => ({
+    id: t.id,
+    name: t.name,
+    mastery_score: t.masteryScore,
+    tier: t.tier,
+    has_interacted: t.hasInteracted,
+  }));
+
   const topicMap = new Map<string, TopicSnapshot>(
-    topicRows.map((t) => [t.id, { id: t.id, name: t.name }]),
+    notebookTopicsRaw.map((t) => [t.id, { id: t.id, name: t.name }]),
   );
   const replay = interactionsToUIMessages(interactions, topicMap);
 
@@ -69,6 +71,8 @@ export default async function NotebookPage({ params }: PageProps) {
     <NotebookDetail
       notebook={notebook}
       materials={materials}
+      notebookTopics={notebookTopics}
+      topicsExtracting={rawNotebook.topicsExtracting}
       initialMessages={replay.messages}
       initialInteractionId={replay.lastUnscoredId}
     />

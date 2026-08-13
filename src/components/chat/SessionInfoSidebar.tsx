@@ -1,18 +1,17 @@
 "use client";
 
-import { Target, Zap, Brain, AlertCircle, X } from "lucide-react";
+import { Target, Zap, Brain, Circle, AlertCircle, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { Tier, Correctness } from "@/types";
+import type { Tier, Correctness, NotebookTopicStatus } from "@/types";
 
 interface SessionInfoSidebarProps {
   notebookTitle: string;
   sourceCount: number;
-  topicName: string | null;
-  masteryScore: number | null;
-  tier: Tier | null;
+  topics: NotebookTopicStatus[];
+  currentTopicName: string | null;
   recentCorrectness: Correctness[];
   mobileOpen?: boolean;
   onMobileClose?: () => void;
@@ -39,48 +38,61 @@ const TIER_META: Record<Tier, { label: string; range: string; icon: React.Compon
   },
 };
 
+// Kept separate from TIER_META/Tier — "not started" is a UI display state
+// for a taxonomy-seeded topic the student hasn't asked about yet, not a
+// mastery tier used anywhere else in the codebase.
+const NOT_STARTED_META = {
+  label: "Not started",
+  icon: Circle,
+  className: "bg-muted text-muted-foreground border-border",
+};
+
 const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }> = {
   correct: { className: "bg-emerald-500", title: "Correct" },
   correct_with_hint: { className: "bg-amber-500", title: "Partially correct" },
   incorrect: { className: "bg-red-500", title: "Incorrect" },
 };
 
+function TopicRow({ topic, isCurrent }: { topic: NotebookTopicStatus; isCurrent: boolean }) {
+  const meta = topic.has_interacted ? TIER_META[topic.tier] : NOT_STARTED_META;
+  const Icon = meta.icon;
+  return (
+    <div className={cn("rounded-lg border p-2.5", isCurrent ? "border-primary/40 bg-primary/5" : "border-border")}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
+        <Badge variant="outline" className={cn("gap-1 text-[10px] shrink-0", meta.className)}>
+          <Icon className="size-2.5" />
+          {meta.label}
+        </Badge>
+      </div>
+      {/* No number rendered anywhere in this row — the bar's fill is the
+          only signal of progress within a tier, deliberately not paired
+          with a digit or a title tooltip. */}
+      <Progress value={topic.has_interacted ? topic.mastery_score : 0} className="mt-2 h-1" />
+    </div>
+  );
+}
+
 export function SessionInfoSidebar({
   notebookTitle,
   sourceCount,
-  topicName,
-  masteryScore,
-  tier,
+  topics,
+  currentTopicName,
   recentCorrectness,
   mobileOpen = false,
   onMobileClose,
 }: SessionInfoSidebarProps) {
-  const tierMeta = tier ? TIER_META[tier] : null;
-  const TierIcon = tierMeta?.icon;
-
   const cards = (
     <>
-      {/* Mastery */}
+      {/* Topics */}
       <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Mastery</p>
-        {topicName && masteryScore !== null && tier ? (
-          <>
-            <p className="mt-3 text-sm font-medium capitalize">{topicName}</p>
-            <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-3xl font-bold tabular-nums">{masteryScore}</span>
-              <span className="text-sm text-muted-foreground">/ 100</span>
-            </div>
-            <Progress value={masteryScore} className="mt-2 h-1.5" />
-            {tierMeta && TierIcon && (
-              <div className="mt-3 flex items-center gap-2">
-                <Badge variant="outline" className={cn("gap-1 text-xs", tierMeta.className)}>
-                  <TierIcon className="size-3" />
-                  {tierMeta.label}
-                </Badge>
-                <span className="text-xs text-muted-foreground">Tier range {tierMeta.range}</span>
-              </div>
-            )}
-          </>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Topics</p>
+        {topics.length > 0 ? (
+          <div className="mt-3 flex flex-col gap-2 max-h-80 overflow-y-auto">
+            {topics.map((t) => (
+              <TopicRow key={t.id} topic={t} isCurrent={t.name === currentTopicName} />
+            ))}
+          </div>
         ) : (
           <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
             <AlertCircle className="size-3.5" />
@@ -118,11 +130,9 @@ export function SessionInfoSidebar({
           How this works
         </p>
         <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-          The tutor answers from your sources, then ends with a Quick check.{" "}
-          Right answer <span className="text-emerald-600 font-medium">+10</span>,{" "}
-          partially correct <span className="text-amber-600 font-medium">+5</span>,{" "}
-          wrong <span className="text-red-600 font-medium">−10</span>,{" "}
-          skip <span className="text-muted-foreground font-medium">−5</span>.
+          The tutor answers from your sources, then ends with a Quick check.
+          Answer well and you&apos;ll move on to harder material faster; miss
+          one and you&apos;ll get another shot at the same idea before moving on.
         </p>
       </div>
     </>
@@ -136,7 +146,7 @@ export function SessionInfoSidebar({
           <div className="fixed inset-0 bg-black/50" onClick={onMobileClose} />
           <aside className="fixed inset-y-0 right-0 flex flex-col w-80 max-w-[85vw] bg-background shadow-2xl">
             <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
-              <p className="text-sm font-semibold">Mastery</p>
+              <p className="text-sm font-semibold">Topics</p>
               <Button variant="ghost" size="icon-sm" onClick={onMobileClose}>
                 <X className="size-4" />
               </Button>

@@ -34,15 +34,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SessionInfoSidebar } from "./SessionInfoSidebar";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/ai/chat-types";
-import type { Notebook, Material, Correctness, Tier } from "@/types";
+import type { Notebook, Material, Correctness, Tier, NotebookTopicStatus } from "@/types";
 
 interface ChatThreadProps {
   notebook: Notebook;
   materials: Material[];
+  notebookTopics: NotebookTopicStatus[];
+  topicsExtracting: boolean;
   initialMessages: ChatMessage[];
   initialInteractionId: string | null;
   mobileMasteryOpen?: boolean;
   onMobileMasteryClose?: () => void;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 const CORRECTNESS_STYLES: Record<string, { label: string; className: string }> = {
@@ -71,6 +77,8 @@ const CORRECTNESS_STYLES: Record<string, { label: string; className: string }> =
 export function ChatThread({
   notebook,
   materials,
+  notebookTopics,
+  topicsExtracting,
   initialMessages,
   initialInteractionId,
   mobileMasteryOpen = false,
@@ -121,6 +129,28 @@ export function ChatThread({
     return { topicName, masteryScore, tier, recentCorrectness };
   }, [messages]);
 
+  // Merges the server-fetched notebook topic list with whatever's currently
+  // live in this conversation (from the useMemo above, updated in real time
+  // via streamed data-topic/data-score parts) — so the active topic's
+  // row reflects its freshest score/tier without a full page refetch, and a
+  // topic classified ad hoc mid-session (not in the server snapshot) still
+  // shows up rather than being silently dropped.
+  const sidebarTopics = useMemo((): NotebookTopicStatus[] => {
+    if (!topicName) return notebookTopics;
+    const idx = notebookTopics.findIndex((t) => t.name === topicName);
+    const liveRow: NotebookTopicStatus = {
+      id: idx === -1 ? `live-${topicName}` : notebookTopics[idx].id,
+      name: topicName,
+      mastery_score: masteryScore ?? 0,
+      tier: tier ?? "recall",
+      has_interacted: true,
+    };
+    if (idx === -1) return [liveRow, ...notebookTopics];
+    return notebookTopics.map((t, i) => (i === idx ? liveRow : t));
+  }, [notebookTopics, topicName, masteryScore, tier]);
+
+  const startTopics = notebookTopics.filter((t) => !t.has_interacted).slice(0, 3);
+
   function send(userText: string) {
     const trimmed = userText.trim();
     if (!trimmed || noReadySources) return;
@@ -166,31 +196,37 @@ export function ChatThread({
                   <div className="flex items-center gap-1.5 text-primary">
                     <Sparkles className="size-3.5" />
                     <span className="text-xs font-medium tracking-wide uppercase">
-                      Notebook summary
+                      Here&apos;s what we&apos;ll cover
                     </span>
                   </div>
                   <p className="text-sm leading-relaxed text-foreground">
                     {notebook.summary}
                   </p>
-                  {notebook.starter_suggestions.length > 0 && (
+                  {startTopics.length > 0 ? (
                     <div className="space-y-2 pt-1">
                       <p className="text-xs font-medium text-muted-foreground">
-                        Try asking:
+                        Start with:
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {notebook.starter_suggestions.map((s, i) => (
+                        {startTopics.map((t) => (
                           <button
-                            key={i}
+                            key={t.id}
                             type="button"
-                            onClick={() => send(s)}
+                            onClick={() => send(`Teach me ${capitalize(t.name)}`)}
                             className="rounded-full border border-border bg-muted/50 px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
                           >
-                            {s}
+                            Teach me {capitalize(t.name)}
                           </button>
                         ))}
                       </div>
                     </div>
-                  )}
+                  ) : topicsExtracting ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Skeleton className="h-7 w-40 rounded-full" />
+                      <Skeleton className="h-7 w-48 rounded-full" />
+                      <Skeleton className="h-7 w-36 rounded-full" />
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 // Materials are ready but the background summary generation
@@ -286,9 +322,8 @@ export function ChatThread({
       <SessionInfoSidebar
         notebookTitle={notebook.title}
         sourceCount={materials.length}
-        topicName={topicName}
-        masteryScore={masteryScore}
-        tier={tier}
+        topics={sidebarTopics}
+        currentTopicName={topicName}
         recentCorrectness={recentCorrectness}
         mobileOpen={mobileMasteryOpen}
         onMobileClose={onMobileMasteryClose}
@@ -365,15 +400,9 @@ function AssistantTurn({ message }: { message: ChatMessage }) {
               </Badge>
             )}
             {score && correctnessStyle && (
-              <>
-                <Badge variant="outline" className={cn("text-xs", correctnessStyle.className)}>
-                  {correctnessStyle.label}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {score.score_delta >= 0 ? "+" : ""}
-                  {score.score_delta} pts · score {score.new_score}/100
-                </span>
-              </>
+              <Badge variant="outline" className={cn("text-xs", correctnessStyle.className)}>
+                {correctnessStyle.label}
+              </Badge>
             )}
           </div>
         )}

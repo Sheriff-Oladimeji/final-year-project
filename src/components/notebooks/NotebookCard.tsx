@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Book, FileText, Brain, MoreVertical, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -184,12 +184,7 @@ export function NotebookCard({
               {topicCount} topic{topicCount === 1 ? "" : "s"}
             </span>
             {averageMastery !== null ? (
-              <Badge
-                variant="outline"
-                className="bg-primary/10 text-primary border-primary/20 text-xs tabular-nums w-16 justify-center"
-              >
-                {averageMastery} / 100
-              </Badge>
+              <Progress value={averageMastery} className="h-1.5 w-16" />
             ) : (
               <span className="w-16" />
             )}
@@ -237,14 +232,9 @@ export function NotebookCard({
           </div>
 
           {averageMastery !== null && (
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className="bg-primary/10 text-primary border-primary/20 text-xs tabular-nums"
-              >
-                {averageMastery} / 100
-              </Badge>
-              <span className="text-xs text-muted-foreground">avg mastery</span>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Progress</p>
+              <Progress value={averageMastery} className="h-1.5" />
             </div>
           )}
         </CardContent>

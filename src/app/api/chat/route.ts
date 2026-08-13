@@ -14,7 +14,6 @@ import {
   CLASSIFY_TOPIC_TEMPLATE,
   DIRECT_ANSWER_TEMPLATE,
   AFTER_CORRECT_TEMPLATE,
-  NEXT_CONCEPT_TEMPLATE,
   ADVANCE_TEMPLATE,
   MASTERY_COMPLETE_TEMPLATE,
   REVEAL_TEMPLATE,
@@ -29,6 +28,7 @@ import {
   getOrCreateTopic,
   updateMasteryScore,
   listNotebookTopicNames,
+  findNextUninteractedTopic,
 } from "@/db/queries/topics";
 import {
   createInteraction,
@@ -139,45 +139,6 @@ Quote the source text directly. If nothing relevant is found, output: []`,
     // fall through to fallback
   }
   return fallbackNames.map((name) => ({ name }));
-}
-
-/**
- * After a topic is mastered, ask (grounded via file_search against the actual
- * course material) whether there is a further, unstudied topic to advance to,
- * and if so what it's called. Returns null when the model can't find one, or
- * when it names the same topic the student just mastered — both treated as
- * "nothing to advance to" so the caller falls back to deepening the current
- * topic instead of looping.
- */
-async function determineNextConcept(
-  topicName: string,
-  notebookTitle: string,
-  fileSearchStoreName: string,
-): Promise<string | null> {
-  try {
-    const { text } = await generateText({
-      model: geminiModel,
-      providerOptions: NO_THINKING,
-      tools: { file_search: google.tools.fileSearch({ fileSearchStoreNames: [fileSearchStoreName] }) },
-      prompt: NEXT_CONCEPT_TEMPLATE(topicName, notebookTitle),
-    });
-    const match = text.match(/\{[\s\S]*?\}/);
-    if (match) {
-      const parsed = JSON.parse(match[0]) as { next_topic?: string | null };
-      let nextTopic = parsed.next_topic?.trim();
-      if (nextTopic && nextTopic.length > 100) nextTopic = nextTopic.slice(0, 100);
-      if (
-        nextTopic &&
-        nextTopic.toLowerCase() !== "null" &&
-        nextTopic.toLowerCase() !== topicName.toLowerCase()
-      ) {
-        return nextTopic;
-      }
-    }
-  } catch {
-    // fall through
-  }
-  return null;
 }
 
 /**
@@ -385,12 +346,8 @@ export async function POST(req: Request) {
         // answer gets one more reinforcement round on the same topic first
         // (via AFTER_CORRECT_TEMPLATE's wasHint branch below) before it's
         // eligible to advance on the next clean answer.
-        let nextTopicName: string | null = null;
-        if (correctness === "correct") {
-          nextTopicName = await determineNextConcept(topic.name, notebookTitle, fileSearchStoreName);
-        }
-        const advanceTopic = nextTopicName
-          ? await getOrCreateTopic(userId, notebookId, nextTopicName)
+        const advanceTopic = correctness === "correct"
+          ? await findNextUninteractedTopic(userId, notebookId)
           : null;
 
         const prompt = advanceTopic

@@ -18,7 +18,6 @@ export interface Notebook {
   user_id: string;
   title: string;
   summary: string | null;
-  starter_suggestions: string[];
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +75,19 @@ export interface Topic {
   updated_at: string;
   recent_history: ScoreHistoryEntry[];
   tier: Tier;
+}
+
+// Lightweight notebook-scoped topic shape for the student-facing topic map
+// and starter chips — no recent_history (unlike Topic above, used by
+// admin/dashboard views). Never render mastery_score's raw number to a
+// student — see SessionInfoSidebar/NotebookCard, where the score stays
+// under the hood.
+export interface NotebookTopicStatus {
+  id: string;
+  name: string;
+  mastery_score: number;
+  tier: Tier;
+  has_interacted: boolean;
 }
 
 export interface Interaction {

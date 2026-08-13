@@ -43,24 +43,32 @@ interface SourcesPanelProps {
   // material itself is "ready", since summary generation is a separate,
   // slightly later background step (see regenerateNotebookSummary).
   notebookSummaryReady: boolean;
+  // Whether topic-taxonomy extraction is still running — separately gates
+  // polling too. It fires after summary generation in the upload pipeline,
+  // so without this, polling could stop right when the summary lands while
+  // the topic map/starter chips (which depend on the taxonomy, not the
+  // summary) are still empty, with nothing left to refresh them.
+  topicsExtracting: boolean;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
 
-export function SourcesPanel({ notebookId, materials, cap, notebookSummaryReady, mobileOpen = false, onMobileClose }: SourcesPanelProps) {
+export function SourcesPanel({ notebookId, materials, cap, notebookSummaryReady, topicsExtracting, mobileOpen = false, onMobileClose }: SourcesPanelProps) {
   const router = useRouter();
   const count = materials.length;
   const atCap = count >= cap;
   const [collapsed, setCollapsed] = useState(false);
 
   // Poll every 3 s while any source is indexing, ready-but-no-suggestions
-  // yet, or the notebook summary hasn't landed yet.
+  // yet, the notebook summary hasn't landed yet, or topic extraction is
+  // still running.
   // Cap at 20 polls (~60 s) to prevent infinite loops if generation fails.
   const [pollCount, setPollCount] = useState(0);
   const hasReadyMaterial = materials.some((m) => m.status === "ready");
   const shouldPoll =
     materials.some((m) => m.status === "pending" || (m.status === "ready" && m.suggestions.length === 0)) ||
-    (hasReadyMaterial && !notebookSummaryReady);
+    (hasReadyMaterial && !notebookSummaryReady) ||
+    (hasReadyMaterial && topicsExtracting);
   useEffect(() => {
     if (!shouldPoll || pollCount >= 20) return;
     const id = setInterval(() => {

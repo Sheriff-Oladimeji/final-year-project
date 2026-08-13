@@ -1,0 +1,1 @@
+ALTER TABLE "notebooks" ADD COLUMN "topics_extraction_claimed_at" timestamp with time zone;

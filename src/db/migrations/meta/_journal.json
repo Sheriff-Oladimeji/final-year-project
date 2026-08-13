@@ -85,6 +85,20 @@
       "when": 1786441300941,
       "tag": "0011_careful_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786599743610,
+      "tag": "0012_mature_thundra",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786619072132,
+      "tag": "0013_mixed_famine",
+      "breakpoints": true
     }
   ]
 }

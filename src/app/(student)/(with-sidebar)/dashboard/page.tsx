@@ -23,7 +23,6 @@ export default async function DashboardPage() {
     user_id: n.userId,
     title: n.title,
     summary: n.summary,
-    starter_suggestions: n.starterSuggestions ?? [],
     created_at: n.createdAt.toISOString(),
     updated_at: n.updatedAt.toISOString(),
   }));

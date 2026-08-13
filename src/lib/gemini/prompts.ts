@@ -168,7 +168,7 @@ export const CLASSIFY_TOPIC_TEMPLATE = (
 You are classifying a student question by topic.
 
 Question: ${question}
-${recentTopics.length > 0 ? `\nExisting topics for this notebook:\n${recentTopics.map((t) => `- ${t}`).join("\n")}\n\nChoose the SINGLE closest-matching label from this list if the question is genuinely about one of them, even if loosely phrased — reuse its exact text, do not paraphrase it. Only invent a new label if the question is about a concept not covered by ANY label above — a different concept, not just a different phrasing of one already listed. When in doubt, prefer reusing — but never force-fit a question into a label that's actually about something else.` : ""}
+${recentTopics.length > 0 ? `\nExisting topics for this notebook:\n${recentTopics.map((t) => `- ${t}`).join("\n")}\n\nReuse an existing label EXACTLY only if the question is about the SAME concept as that label, just phrased differently (a paraphrase, synonym, or direct follow-up on the identical idea) — reuse its exact text, do not paraphrase it. If the question is about a specifically different concept, even a closely related one from the same subject area (e.g. a different named technique, a different section topic), it must get its own new label — do not fold related-but-distinct concepts together just because they're topically nearby. Some of these labels may be for concepts this student hasn't actually asked about yet (pre-extracted from the material's own structure) — that doesn't make them a safe default match. When in doubt, prefer a new label over merging into an existing one.` : ""}
 
 Reply with only a short topic label of 2 to 5 words (e.g. "binary search trees",
 "TCP/IP model", "merge sort complexity"). No punctuation. No explanation.
@@ -308,7 +308,7 @@ export const AFTER_CORRECT_TEMPLATE = (
 ) => `\
 You are a smart AI tutor for "${notebookTitle}".
 The student just answered a Quick check ${wasHint ? "mostly correctly (they needed a small hint)" : "correctly"}.
-Search the course materials to ground your response.
+Search the course materials and ground your response ONLY in what you find there. Never invent facts.
 
 Original question: ${originalQuestion}
 Student's answer: ${studentAnswer}
@@ -345,34 +345,12 @@ Quick check: [your question]
 ${buildQuickCheckRules(tier, "you introduced in this response")}
 `;
 
-// ── Deciding what comes next, grounded in the material's own structure ─────
-
-export const NEXT_CONCEPT_TEMPLATE = (
-  topic: string,
-  notebookTitle: string,
-) => `\
-You are deciding what a student studying "${notebookTitle}" should learn next.
-The student has just demonstrated solid understanding of the concept "${topic}".
-
-Use file_search to look at how the course material is actually organised —
-chapters, sections, headings, the order topics are introduced — and find
-where "${topic}" sits in that structure.
-
-Decide whether there is a DIFFERENT topic, concept, or subtopic that appears
-later in the material's own structure that the student has not yet studied.
-If yes, name only the single most immediate next one — do not skip ahead
-several sections, and do not invent a topic that is not actually present in
-the material.
-
-Reply with ONLY this JSON object, no other text, no markdown fences:
-{"next_topic": "<topic name, 2-5 words, or null if you cannot find a further unstudied topic in the material>"}
-
-The topic name must come directly from the material's own structure. If you
-are not confident such a next topic exists in the material, use null — do not
-guess.
-`;
-
 // ── Advancing to the next concept after mastery is confirmed ───────────────
+// "What's next" used to be decided by asking Gemini to re-read the material's
+// structure fresh each time (NEXT_CONCEPT_TEMPLATE, retired) — replaced with
+// a plain DB lookup against the taxonomy already extracted at upload time
+// (findNextUninteractedTopic in src/db/queries/topics.ts). Faster (no Gemini
+// call) and can't fail to rediscover a topic the taxonomy already has.
 
 export const ADVANCE_TEMPLATE = (
   masteredTopic: string,
@@ -432,7 +410,8 @@ export const REVEAL_TEMPLATE = (
   notebookTitle: string,
 ) => `\
 The student gave up on a Quick check in their notebook "${notebookTitle}". Reveal
-the answer and move them forward. Search the course materials to ground your response.
+the answer and move them forward. Search the course materials and ground your
+response ONLY in what you find there. Never invent facts.
 
 The tutor's previous response (contains the Quick check they couldn't answer):
 ${previousTutorResponse}
@@ -525,6 +504,10 @@ export const SUGGESTIONS_PROMPT = `\
 You are creating starter questions for a learning session about the course
 material in this notebook.
 
+Search the course materials and generate questions ONLY about content that is
+actually present in the material. Never invent facts or reference content
+that isn't there.
+
 Generate exactly 4 short, distinct questions a student might ask to understand
 this material better. Cover different angles: definition, mechanism, application,
 and limitation/trade-off.
@@ -537,31 +520,17 @@ or "this document".
 // ── Notebook-level overview shown before the student's first message ──────
 
 export const NOTEBOOK_SUMMARY_TEMPLATE = (notebookTitle: string) => `\
-You are creating an overview for a student opening the notebook
-"${notebookTitle}" for the first time, before they've asked anything.
+You are opening the notebook "${notebookTitle}" with a student for the
+first time.
 
-Use file_search across ALL the course materials in this notebook and produce:
+Use file_search across ALL the course materials and write 2 to 4 sentences
+introducing what you'll teach them — directive, first-person framing
+("I'll teach you...", "We'll start with...", "This covers..."), not a
+third-person briefing. Ground every claim in what you actually find; never
+invent a topic that isn't in the material. Do not say "this document" or
+"the material" — refer to the content directly.
 
-1. SUMMARY — 2 to 4 sentences on what these materials actually cover (the
-   main topics and how they're structured), written like a knowledgeable
-   teaching assistant briefing a student, not a table of contents. Ground
-   every claim in what you actually find; never invent a topic that isn't
-   in the material. Do not say "this document" or "the material" — refer
-   to the content directly.
-
-2. SUGGESTIONS — exactly 3 starter questions the student might want to ask
-   to begin studying. Natural first-person phrasing a real student would
-   type, 8 to 14 words each, not numbered or prefixed:
-   - One should connect the material to something a student would
-     plausibly already know before this course — a prior-knowledge
-     entry point, not a quiz question (e.g. "how does this compare to
-     what I already know about X?").
-   - The other two should invite exploring the actual content from
-     different angles (a definition, a mechanism, an application, a
-     trade-off) — vary them, don't all ask "what is X?".
-
-Reply with ONLY this JSON object, no other text, no markdown fences:
-{"summary": "...", "suggestions": ["...", "...", "..."]}
+Reply with ONLY the summary text — no JSON, no markdown fences, no preamble.
 `;
 
 // ── Topic taxonomy extraction — runs on every material upload, independent

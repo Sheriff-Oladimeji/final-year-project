@@ -10,7 +10,7 @@
 
 import { getNotebook, claimTopicsExtractionSlot, releaseTopicsExtractionSlot } from "@/db/queries/notebooks";
 import { getOrCreateTopic, listNotebookTopicNames } from "@/db/queries/topics";
-import { getLatestReadyMaterialIndexedAt } from "@/db/queries/materials";
+import { getLatestReadyMaterialIndexedAt, MATERIALS_PER_NOTEBOOK_CAP } from "@/db/queries/materials";
 import { extractNotebookTopics } from "@/lib/ai/suggestions";
 
 export interface TaxonomyRunResult {
@@ -51,7 +51,14 @@ export async function regenerateTopicTaxonomy(notebookId: string, userId: string
   const claimed = await claimTopicsExtractionSlot(notebookId, userId);
   if (!claimed) return { ran: false, labelsSeeded: 0 }; // another call is already draining
 
-  const MAX_PASSES = 5; // safety valve — not expected to hit in practice at a 10-material cap
+  // Bounded by the per-notebook material cap, not an arbitrary small number:
+  // in the worst case, every one of up to MATERIALS_PER_NOTEBOOK_CAP
+  // materials finishes indexing during this drain loop, one per pass. A
+  // lower cap can exit before genuinely catching up while still stamping
+  // topicsExtractedAt as current — silently dropping whichever materials
+  // arrived after the last pass, with nothing left to retry them if that
+  // was the student's final upload to this notebook.
+  const MAX_PASSES = MATERIALS_PER_NOTEBOOK_CAP;
   let lastCovered: Date | null = null;
   let labelsSeeded = 0;
 
@@ -61,10 +68,12 @@ export async function regenerateTopicTaxonomy(notebookId: string, userId: string
       if (!snapshot) break;
       if (lastCovered && lastCovered >= snapshot) break; // caught up, nothing new since last pass
 
-      const nbFresh = await getNotebook(notebookId, userId);
+      const [nbFresh, existing] = await Promise.all([
+        getNotebook(notebookId, userId),
+        listNotebookTopicNames(userId, notebookId),
+      ]);
       if (!nbFresh) break;
 
-      const existing = await listNotebookTopicNames(userId, notebookId);
       const labels = await extractNotebookTopics(notebookId, nbFresh.title, existing);
       if (labels.length > 0) {
         await Promise.all(labels.map((label) => getOrCreateTopic(userId, notebookId, label)));

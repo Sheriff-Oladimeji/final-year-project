@@ -43,15 +43,17 @@ export async function generateMaterialSuggestions(material: Material): Promise<s
 }
 
 /**
- * Notebook-level overview (summary + starter questions) shown before the
- * student's first message. Generated once per notebook — see the claim-slot
- * gating in regenerateNotebookSummary() in src/actions/materials.ts. Topic
- * taxonomy extraction is fully independent — see extractNotebookTopics below.
+ * Notebook-level overview shown before the student's first message.
+ * Generated once per notebook — see the claim-slot gating in
+ * regenerateNotebookSummary() in src/actions/materials.ts. Starter chips are
+ * no longer a separate LLM-generated field here — ChatThread derives them
+ * directly from the same topic taxonomy used for the sidebar (see
+ * extractNotebookTopics below), so the two can't drift out of sync.
  */
 export async function generateNotebookSummary(
   notebookId: string,
   notebookTitle: string,
-): Promise<{ summary: string; suggestions: string[] } | null> {
+): Promise<string | null> {
   const notebookRows = await db
     .select({ fileSearchStoreName: notebooks.fileSearchStoreName })
     .from(notebooks)
@@ -70,16 +72,8 @@ export async function generateNotebookSummary(
       prompt: NOTEBOOK_SUMMARY_TEMPLATE(notebookTitle),
     });
 
-    const match = text.match(/\{[\s\S]*?\}/);
-    if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { summary?: unknown; suggestions?: unknown };
-    if (typeof parsed.summary !== "string" || !parsed.summary.trim()) return null;
-
-    const suggestions = Array.isArray(parsed.suggestions)
-      ? parsed.suggestions.slice(0, 3).filter((s): s is string => typeof s === "string")
-      : [];
-
-    return { summary: parsed.summary.trim(), suggestions };
+    const trimmed = text.trim();
+    return trimmed.length > 0 ? trimmed : null;
   } catch {
     return null;
   }

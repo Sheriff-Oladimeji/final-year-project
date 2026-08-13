@@ -26,11 +26,13 @@ import { SourcesPanel } from "./SourcesPanel";
 import { renameNotebookAction, deleteNotebookAction } from "@/actions/notebooks";
 import { MATERIALS_PER_NOTEBOOK_CAP } from "@/db/queries/materials";
 import type { ChatMessage } from "@/lib/ai/chat-types";
-import type { Notebook, Material } from "@/types";
+import type { Notebook, Material, NotebookTopicStatus } from "@/types";
 
 interface NotebookDetailProps {
   notebook: Notebook;
   materials: Material[];
+  notebookTopics: NotebookTopicStatus[];
+  topicsExtracting: boolean;
   initialMessages: ChatMessage[];
   initialInteractionId: string | null;
 }
@@ -38,6 +40,8 @@ interface NotebookDetailProps {
 export function NotebookDetail({
   notebook,
   materials,
+  notebookTopics,
+  topicsExtracting,
   initialMessages,
   initialInteractionId,
 }: NotebookDetailProps) {
@@ -94,12 +98,15 @@ export function NotebookDetail({
           materials={materials}
           cap={MATERIALS_PER_NOTEBOOK_CAP}
           notebookSummaryReady={notebook.summary !== null}
+          topicsExtracting={topicsExtracting}
           mobileOpen={mobileSources}
           onMobileClose={() => setMobileSources(false)}
         />
         <ChatThread
           notebook={notebook}
           materials={materials}
+          notebookTopics={notebookTopics}
+          topicsExtracting={topicsExtracting}
           initialMessages={initialMessages}
           initialInteractionId={initialInteractionId}
           mobileMasteryOpen={mobileMastery}

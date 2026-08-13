@@ -156,6 +156,13 @@ export const notebooks = pgTable(
     // src/actions/materials.ts for why that distinction matters).
     topicsExtracting:    boolean("topics_extracting").notNull().default(false),
     topicsExtractedAt:   timestamp("topics_extracted_at", { withTimezone: true }),
+    // Set the moment topicsExtracting flips true, cleared alongside it on
+    // release. Exists so a crashed/killed background task (deploy restart,
+    // execution-time limit hit mid-drain-loop) can't leave the mutex stuck
+    // true forever with no recovery path — claimTopicsExtractionSlot treats
+    // a claim older than a short staleness window as abandoned and lets a
+    // later caller reclaim it.
+    topicsExtractionClaimedAt: timestamp("topics_extraction_claimed_at", { withTimezone: true }),
     createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:           timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
