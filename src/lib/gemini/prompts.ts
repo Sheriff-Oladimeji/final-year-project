@@ -43,16 +43,25 @@ explanation.
   three bullets built by rephrasing the same one-line definition three
   ways, not from three things the source actually distinguished.
 
-LEAD — one sentence, grounded in the material, that states the answer
-directly with the key term or number in **bold**. If the concept is easily
-confused with something adjacent, spend one short clause on the contrast —
-what it is NOT — before stating what it IS; skip the contrast when there's
-nothing it's commonly confused with.
+LEAD — EXACTLY one sentence, grounded in the material, that states the
+answer directly with the key term or number in **bold**. Not two sentences,
+not a sentence plus a clarifying follow-up — one. If the concept is easily
+confused with something adjacent, the contrast clause and the definition
+clause together still form ONE sentence (join them with a dash, not a
+period). Anything more you want to say about the concept belongs in MAKE IT
+STICK or BREAK IT DOWN below, not stacked onto the lead.
   GOOD: "Your notes define **project management** as the disciplined
   process of planning, organizing, directing, and controlling resources."
   GOOD (with contrast): "**Bandwidth** isn't how fast a signal oscillates —
   that's frequency. Bandwidth is about **capacity**: how much data a
   channel can carry at once."
+  BAD: "Human-Computer Interaction (HCI) is a **multidisciplinary field**
+  focused on designing, evaluating, and implementing interactive computing
+  systems for human use. It specifically examines the connection between
+  people and computers, aiming to make technology usable, efficient, and
+  satisfying." — two full sentences before the reader has even reached the
+  analogy or the breakdown; the second sentence is scope-expanding detail
+  that belongs later, not stacked onto the lead.
   BAD: "According to the source, project management is a process that
   involves several activities." — vague attribution, no bolded term, tells
   the reader nothing concrete.
@@ -116,6 +125,36 @@ never a fake bold heading) if the answer has more than one such section.
   BAD: "This process involves planning, which means defining objectives, as
   well as organizing, which means arranging resources, and also..." — a
   list dressed up as a sentence. Split it.
+
+ONE NAMED THING PER LINE — this is what makes BREAK IT DOWN actually
+scannable instead of just technically a bullet. If a bullet's own label has
+3 or more further named sub-terms under it (attributes, examples, types),
+do NOT pack them as bolded parentheticals inside one run-on sentence —
+give each one its own line, either as its own top-level bullet or an
+indented sub-bullet under the parent. A reader should be able to glance
+down the list and read each named thing on its own line, not parse a
+sentence to find where one bolded term ends and the next begins.
+  GOOD:
+  - **Usability**: how effectively, efficiently, and satisfyingly a user
+    can achieve their goals with a system. It has five attributes:
+    - **Learnability**: how easy the system is to learn.
+    - **Efficiency**: how fast an experienced user can work.
+    - **Memorability**: how well a casual user remembers how to use it.
+    - **Errors**: how many mistakes users make, and how well they recover.
+    - **Satisfaction**: how pleasant the experience is.
+  BAD: "**Usability**: This refers to how effectively, efficiently, and
+  with what level of satisfaction specific users can achieve specific goals
+  with a system. Important attributes of usability include how easy a
+  system is to learn (**learnability**), how fast experienced users can
+  work (**efficiency**), how well casual users remember its use
+  (**memorability**), how many errors users make and how they recover
+  (**errors**), and how pleasant the overall experience is
+  (**satisfaction**)." — five distinct named concepts buried inside one
+  67-word sentence; nothing about this is scannable at a glance.
+When a parent item unpacks into its own sub-list like this, that sub-list
+still counts toward CHUNK LIMIT below — a parent with 5 sub-items IS 5
+items for budgeting purposes, not 1.
+
 Only fall back to 1-2 short sentences — never a whole paragraph — when the
 concept genuinely has no separable parts.
 
