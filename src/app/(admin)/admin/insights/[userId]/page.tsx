@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Target, Zap, Brain } from "lucide-react";
 import { findById } from "@/db/queries/users";
 import { listTopicsWithHistory } from "@/db/queries/topics";
+import { listNotebooks } from "@/db/queries/notebooks";
 import { getStudentAnalytics } from "@/db/queries/analytics";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,15 +21,39 @@ const TIER_META: Record<Tier, { label: string; range: string; icon: React.Compon
 export default async function StudentInsightsPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params;
 
-  const [student, topicHistory, cohort] = await Promise.all([
+  const [student, topicHistory, notebooks, cohort] = await Promise.all([
     findById(userId),
     listTopicsWithHistory(userId),
+    listNotebooks(userId),
     getStudentAnalytics(),
   ]);
 
   if (!student) notFound();
 
   const stats = cohort.find((s) => s.userId === userId);
+
+  // listTopicsWithHistory is a flat cross-notebook list — group it by
+  // notebook here so a researcher can see coverage per source (e.g. "8/12
+  // topics touched in this notebook") rather than one undifferentiated
+  // list, which is what this page originally shipped with before the
+  // per-notebook topic taxonomy existed. notebooks is already ordered
+  // most-recently-active first (listNotebooks), so groups inherit that
+  // order; a topic whose notebook was since deleted falls into its own
+  // "Deleted notebook" bucket at the end rather than being dropped.
+  const topicsByNotebook = new Map<string, typeof topicHistory>();
+  for (const topic of topicHistory) {
+    const bucket = topicsByNotebook.get(topic.notebookId);
+    if (bucket) bucket.push(topic);
+    else topicsByNotebook.set(topic.notebookId, [topic]);
+  }
+  const notebookGroups = notebooks
+    .filter((nb) => topicsByNotebook.has(nb.id))
+    .map((nb) => ({ id: nb.id, title: nb.title, topics: topicsByNotebook.get(nb.id)! }));
+  const knownNotebookIds = new Set(notebooks.map((nb) => nb.id));
+  const orphanedTopics = topicHistory.filter((t) => !knownNotebookIds.has(t.notebookId));
+  if (orphanedTopics.length > 0) {
+    notebookGroups.push({ id: "orphaned", title: "Deleted notebook", topics: orphanedTopics });
+  }
 
   return (
     <div className="space-y-6">
@@ -85,58 +110,74 @@ export default async function StudentInsightsPage({ params }: { params: Promise<
             <p className="text-sm text-muted-foreground">No topics yet.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {topicHistory.map((topic) => {
-              const tierMeta = TIER_META[topic.tier];
-              const TierIcon = tierMeta.icon;
-              // Oldest first, so the trajectory reads left-to-right in time order.
-              const history = [...topic.recentHistory].reverse();
-
+          <div className="space-y-6">
+            {notebookGroups.map((group) => {
+              const coveredCount = group.topics.filter((t) => t.hasInteracted).length;
               return (
-                <Card key={topic.id}>
-                  <CardContent className="py-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-medium">{topic.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Score {topic.masteryScore}/100 · Updated {topic.updatedAt.toLocaleDateString()}
-                        </p>
-                      </div>
-                      {topic.hasInteracted ? (
-                        <Badge variant="outline" className={cn("gap-1 text-xs", tierMeta.className)}>
-                          <TierIcon className="size-3" />
-                          {tierMeta.label} ({tierMeta.range})
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
-                          Not yet studied
-                        </Badge>
-                      )}
-                    </div>
+                <div key={group.id} className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-medium">{group.title}</h3>
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      {coveredCount}/{group.topics.length} topics covered
+                    </Badge>
+                  </div>
 
-                    {history.length > 0 && (
-                      <div className="mt-3 flex flex-wrap items-center gap-1">
-                        <span className="text-xs text-muted-foreground mr-1">Recent:</span>
-                        {history.map((h, i) => (
-                          <span
-                            key={i}
-                            title={`${h.correctness.replace(/_/g, " ")} · ${new Date(h.created_at).toLocaleDateString()}`}
-                            className={cn(
-                              "rounded px-1.5 py-0.5 text-xs font-mono",
-                              h.score_delta > 0
-                                ? "bg-green-50 text-green-700"
-                                : h.score_delta < 0
-                                  ? "bg-red-50 text-red-700"
-                                  : "bg-muted text-muted-foreground",
+                  <div className="space-y-3">
+                    {group.topics.map((topic) => {
+                      const tierMeta = TIER_META[topic.tier];
+                      const TierIcon = tierMeta.icon;
+                      // Oldest first, so the trajectory reads left-to-right in time order.
+                      const history = [...topic.recentHistory].reverse();
+
+                      return (
+                        <Card key={topic.id}>
+                          <CardContent className="py-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-medium">{topic.name}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Score {topic.masteryScore}/100 · Updated {topic.updatedAt.toLocaleDateString()}
+                                </p>
+                              </div>
+                              {topic.hasInteracted ? (
+                                <Badge variant="outline" className={cn("gap-1 text-xs", tierMeta.className)}>
+                                  <TierIcon className="size-3" />
+                                  {tierMeta.label} ({tierMeta.range})
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                                  Not yet studied
+                                </Badge>
+                              )}
+                            </div>
+
+                            {history.length > 0 && (
+                              <div className="mt-3 flex flex-wrap items-center gap-1">
+                                <span className="text-xs text-muted-foreground mr-1">Recent:</span>
+                                {history.map((h, i) => (
+                                  <span
+                                    key={i}
+                                    title={`${h.correctness.replace(/_/g, " ")} · ${new Date(h.created_at).toLocaleDateString()}`}
+                                    className={cn(
+                                      "rounded px-1.5 py-0.5 text-xs font-mono",
+                                      h.score_delta > 0
+                                        ? "bg-green-50 text-green-700"
+                                        : h.score_delta < 0
+                                          ? "bg-red-50 text-red-700"
+                                          : "bg-muted text-muted-foreground",
+                                    )}
+                                  >
+                                    {h.score_delta > 0 ? `+${h.score_delta}` : h.score_delta}
+                                  </span>
+                                ))}
+                              </div>
                             )}
-                          >
-                            {h.score_delta > 0 ? `+${h.score_delta}` : h.score_delta}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </div>
