@@ -553,6 +553,16 @@ ${
     : "This notebook has no tracked topics yet — extract the initial set."
 }
 
+Order matters: list the topics in the SAME sequence they actually appear in
+the material, top to bottom — the earliest/most foundational concept the
+material introduces first, not alphabetical, not by importance, not
+grouped by theme. This order is what students see the topics in, so it
+must match how the material itself builds from one concept to the next.
+When reusing an existing label, keep it positioned where that concept
+actually falls in the material's sequence rather than leaving it wherever
+it happened to be listed before; place newly-added labels in their correct
+position relative to the rest, not appended at the end by default.
+
 Rules for each label:
 - 2 to 5 words, matching the material's own terminology (e.g. "binary
   search trees" or "TCP/IP model") — no numbering, no punctuation.
