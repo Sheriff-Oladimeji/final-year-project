@@ -134,7 +134,10 @@ export function ChatThread({
   // via streamed data-topic/data-score parts) — so the active topic's
   // row reflects its freshest score/tier without a full page refetch, and a
   // topic classified ad hoc mid-session (not in the server snapshot) still
-  // shows up rather than being silently dropped.
+  // shows up rather than being silently dropped. The topic being worked on
+  // right now is pinned to the front of the list rather than left wherever
+  // its taxonomy/insertion order placed it — that's the one the student
+  // actually wants to see first.
   const sidebarTopics = useMemo((): NotebookTopicStatus[] => {
     if (!topicName) return notebookTopics;
     const idx = notebookTopics.findIndex((t) => t.name === topicName);
@@ -145,8 +148,8 @@ export function ChatThread({
       tier: tier ?? "recall",
       has_interacted: true,
     };
-    if (idx === -1) return [liveRow, ...notebookTopics];
-    return notebookTopics.map((t, i) => (i === idx ? liveRow : t));
+    const rest = idx === -1 ? notebookTopics : notebookTopics.filter((_, i) => i !== idx);
+    return [liveRow, ...rest];
   }, [notebookTopics, topicName, masteryScore, tier]);
 
   const startTopics = notebookTopics.filter((t) => !t.has_interacted).slice(0, 3);

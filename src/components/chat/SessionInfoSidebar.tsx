@@ -1,9 +1,16 @@
 "use client";
 
-import { Target, Zap, Brain, Circle, AlertCircle, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { AlertCircle, HelpCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Tier, Correctness, NotebookTopicStatus } from "@/types";
 
@@ -17,35 +24,19 @@ interface SessionInfoSidebarProps {
   onMobileClose?: () => void;
 }
 
-const TIER_META: Record<Tier, { label: string; range: string; icon: React.ComponentType<{ className?: string }>; className: string }> = {
-  recall: {
-    label: "Recall",
-    range: "0–30",
-    icon: Target,
-    className: "bg-primary/10 text-primary border-primary/20",
-  },
-  application: {
-    label: "Application",
-    range: "31–60",
-    icon: Zap,
-    className: "bg-amber-100/80 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
-  },
-  analysis: {
-    label: "Analysis",
-    range: "61–100",
-    icon: Brain,
-    className: "bg-emerald-100/80 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
-  },
+// No text badge, no icon — both were tried and both tested as either
+// confusing (icon: "no idea what it means") or crowding out the title
+// (badge: forced aggressive truncation on longer topic names). The bar's
+// color now carries the tier on its own — Tailwind's arbitrary-variant
+// syntax targets Progress's inner indicator from outside the primitive
+// (components/ui is shadcn-owned, not edited directly).
+const TIER_BAR_CLASS: Record<Tier, string> = {
+  recall: "[&>[data-slot=progress-indicator]]:bg-primary",
+  application: "[&>[data-slot=progress-indicator]]:bg-amber-500",
+  analysis: "[&>[data-slot=progress-indicator]]:bg-emerald-500",
 };
 
-// Kept separate from TIER_META/Tier — "not started" is a UI display state
-// for a taxonomy-seeded topic the student hasn't asked about yet, not a
-// mastery tier used anywhere else in the codebase.
-const NOT_STARTED_META = {
-  label: "Not started",
-  icon: Circle,
-  className: "bg-muted text-muted-foreground border-border",
-};
+const NOT_STARTED_BAR_CLASS = "[&>[data-slot=progress-indicator]]:bg-muted-foreground/25";
 
 const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }> = {
   correct: { className: "bg-emerald-500", title: "Correct" },
@@ -54,21 +45,22 @@ const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }>
 };
 
 function TopicRow({ topic, isCurrent }: { topic: NotebookTopicStatus; isCurrent: boolean }) {
-  const meta = topic.has_interacted ? TIER_META[topic.tier] : NOT_STARTED_META;
-  const Icon = meta.icon;
+  const barClass = topic.has_interacted ? TIER_BAR_CLASS[topic.tier] : NOT_STARTED_BAR_CLASS;
   return (
-    <div className={cn("rounded-lg border p-2.5", isCurrent ? "border-primary/40 bg-primary/5" : "border-border")}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
-        <Badge variant="outline" className={cn("gap-1 text-[10px] shrink-0", meta.className)}>
-          <Icon className="size-2.5" />
-          {meta.label}
-        </Badge>
-      </div>
-      {/* No number rendered anywhere in this row — the bar's fill is the
-          only signal of progress within a tier, deliberately not paired
-          with a digit or a title tooltip. */}
-      <Progress value={topic.has_interacted ? topic.mastery_score : 0} className="mt-2 h-1" />
+    <div
+      className={cn(
+        "rounded-lg border p-2.5 transition-colors duration-200",
+        isCurrent ? "border-primary/40 bg-primary/5" : "border-border bg-transparent",
+      )}
+    >
+      <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
+      {/* No number rendered anywhere in this row — the bar's fill and color
+          are the only signal, deliberately not paired with a digit, a text
+          badge, or a title tooltip. */}
+      <Progress
+        value={topic.has_interacted ? topic.mastery_score : 0}
+        className={cn("mt-2 h-1.5", barClass)}
+      />
     </div>
   );
 }
@@ -82,13 +74,29 @@ export function SessionInfoSidebar({
   mobileOpen = false,
   onMobileClose,
 }: SessionInfoSidebarProps) {
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+
+  // Topics is the primary panel and claims all available height (flex-1) so
+  // the list doesn't shrink-wrap to a handful of rows and leave dead space
+  // below it — the second most common complaint after the icon confusion.
+  // Recent checks stays compact and fixed-height below it.
   const cards = (
     <>
-      {/* Topics */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Topics</p>
+      <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between shrink-0">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Topics</p>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-5 -mr-1 text-muted-foreground hover:text-foreground"
+            onClick={() => setHowItWorksOpen(true)}
+            title="How this works"
+          >
+            <HelpCircle className="size-3.5" />
+          </Button>
+        </div>
         {topics.length > 0 ? (
-          <div className="mt-3 flex flex-col gap-2 max-h-80 overflow-y-auto">
+          <div className="mt-3 flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto">
             {topics.map((t) => (
               <TopicRow key={t.id} topic={t} isCurrent={t.name === currentTopicName} />
             ))}
@@ -103,7 +111,7 @@ export function SessionInfoSidebar({
 
       {/* Recent checks */}
       {recentCorrectness.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="shrink-0 rounded-xl border border-border bg-card p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Recent quick checks
           </p>
@@ -123,23 +131,27 @@ export function SessionInfoSidebar({
           </p>
         </div>
       )}
-
-      {/* How it works */}
-      <div className="rounded-xl border border-dashed border-border p-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          How this works
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-          The tutor answers from your sources, then ends with a Quick check.
-          Answer well and you&apos;ll move on to harder material faster; miss
-          one and you&apos;ll get another shot at the same idea before moving on.
-        </p>
-      </div>
     </>
   );
 
   return (
     <>
+      <Dialog open={howItWorksOpen} onOpenChange={setHowItWorksOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>How this works</DialogTitle>
+            <DialogDescription asChild>
+              <p className="leading-relaxed">
+                The tutor answers from your sources, then ends with a Quick
+                check. Answer well and you&apos;ll move on to harder material
+                faster; miss one and you&apos;ll get another shot at the same
+                idea before moving on.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
       {/* Mobile overlay drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50">
@@ -151,7 +163,7 @@ export function SessionInfoSidebar({
                 <X className="size-4" />
               </Button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+            <div className="flex-1 min-h-0 p-4 flex flex-col gap-3">
               {cards}
             </div>
           </aside>
@@ -159,7 +171,7 @@ export function SessionInfoSidebar({
       )}
 
       {/* Desktop panel */}
-      <aside className="hidden xl:flex w-64 shrink-0 flex-col gap-3 overflow-y-auto">
+      <aside className="hidden xl:flex w-64 shrink-0 min-h-0 flex-col gap-3">
         {cards}
       </aside>
     </>
