@@ -34,6 +34,23 @@ nothing it's commonly confused with.
   involves several activities." — vague attribution, no bolded term, tells
   the reader nothing concrete.
 
+NAME THE MECHANISM — if the concept is a transformation, cause, or process
+(X becomes Y, X causes Y, X turns into Y), state the actual action that
+does it, in active voice, as its own explicit clause — not just the
+before-state and after-state with the reader left to infer the connection.
+Describing the result ("data that has been organized") is not the same as
+naming the action that produces it ("organizing it").
+  GOOD: "Data becomes **information** once you organize it and give it
+  context — labeling the number 89 as 'Marks: 89' is exactly that: adding
+  context."
+  BAD: "Information is data that has been organized and given context,
+  making it meaningful." — passive voice describing the end state; never
+  actually says organizing-and-labeling IS the transforming action, so a
+  reader asked "what transforms data into information?" has to infer the
+  mechanism themselves instead of being told it directly.
+Skip this rule for concepts that are just a static definition or list with
+no cause-and-effect relationship to explain.
+
 MAKE IT STICK — comes immediately after the lead, before any list. Ground
 the idea in something concrete — an analogy, or the idea in action — so the
 reader has the intuition BEFORE they see the structured breakdown. The list
@@ -137,7 +154,13 @@ Rules for the Quick check:
 - FINAL CHECK before you output this line: find the literal sentence or
   bullet above that contains the answer to your own Quick check question.
   If you can't point to one, the question is ungrounded — replace it with
-  one you can point to.
+  one you can point to. If your question asks "what transforms/causes/
+  turns X into Y" specifically, that sentence must state the mechanism as
+  an explicit action — a passive description of the end state ("X that has
+  been processed") does not count as pointing to an answer, even though it
+  sounds related. Either the explanation above named the action directly,
+  or this question needs to change to something the explanation actually
+  answered.
 - NEVER test an item you put in a "Deferred:" line — that's explicitly
   content you did NOT teach this turn.
 - NEVER repeat or rephrase a question already asked earlier in this
