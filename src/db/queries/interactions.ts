@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, gte, lte, count } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, count, countDistinct } from "drizzle-orm";
 import { db } from "@/db";
 import { interactions, user, topics } from "@/db/schema";
 import type { Interaction } from "@/db/schema";
@@ -103,5 +103,17 @@ export async function listInteractionsAdmin(params: {
 
 export async function countAllInteractions(): Promise<number> {
   const rows = await db.select({ n: count() }).from(interactions);
+  return rows[0]?.n ?? 0;
+}
+
+// Distinct students with at least one interaction since the given time —
+// "banned" was a near-permanently-zero stat for a small live study with no
+// real moderation need; this answers the question an admin actually checks
+// day to day during a time-boxed evaluation: is anyone using this today.
+export async function countActiveStudentsSince(since: Date): Promise<number> {
+  const rows = await db
+    .select({ n: countDistinct(interactions.userId) })
+    .from(interactions)
+    .where(gte(interactions.createdAt, since));
   return rows[0]?.n ?? 0;
 }

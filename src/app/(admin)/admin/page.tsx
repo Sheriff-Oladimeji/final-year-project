@@ -1,13 +1,13 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Users, Ban, FileText, MessageSquare, BarChart3, ListFilter, ArrowRight } from "lucide-react";
+import { Users, Zap, FileText, MessageSquare, BarChart3, ListFilter, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CORRECTNESS_LABELS } from "@/lib/mastery";
-import { countStudents, countBannedStudents } from "@/db/queries/users";
+import { countStudents } from "@/db/queries/users";
 import { countAllMaterials } from "@/db/queries/materials";
-import { countAllInteractions, listInteractionsAdmin } from "@/db/queries/interactions";
+import { countAllInteractions, countActiveStudentsSince, listInteractionsAdmin } from "@/db/queries/interactions";
 import { cn } from "@/lib/utils";
 
 const CORRECTNESS_STYLES: Record<string, string> = {
@@ -29,9 +29,11 @@ function timeAgo(date: Date): string {
 }
 
 export default async function AdminOverviewPage() {
-  const [students, banned, materials, interactions, recentRaw] = await Promise.all([
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const [students, activeToday, materials, interactions, recentRaw] = await Promise.all([
     countStudents(),
-    countBannedStudents(),
+    countActiveStudentsSince(last24h),
     countAllMaterials(),
     countAllInteractions(),
     // Over-fetch and filter client-side rather than adding a query-level
@@ -45,7 +47,7 @@ export default async function AdminOverviewPage() {
 
   const stats = [
     { label: "Students", value: students, icon: Users, href: "/admin/users" },
-    { label: "Banned", value: banned, icon: Ban, href: "/admin/users" },
+    { label: "Active (24h)", value: activeToday, icon: Zap, href: "/admin/interactions" },
     { label: "Materials indexed", value: materials, icon: FileText, href: null },
     { label: "Interactions logged", value: interactions, icon: MessageSquare, href: "/admin/interactions" },
   ];
