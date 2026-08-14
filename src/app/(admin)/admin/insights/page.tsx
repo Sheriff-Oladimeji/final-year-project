@@ -40,7 +40,6 @@ const CORRECTNESS_COLOR: Record<string, string> = {
 export default async function AdminInsightsPage() {
   const students = await getStudentAnalytics();
 
-  const totalInteractions = students.reduce((sum, s) => sum + s.totalInteractions, 0);
   const activeStudents = students.length;
 
   const cohortCorrectness: Record<string, number> = {};
@@ -109,9 +108,6 @@ export default async function AdminInsightsPage() {
               <CardTitle className="text-sm font-medium">Correctness distribution</CardTitle>
               <p className="text-xs text-muted-foreground">
                 {gradedTotal} graded interactions, avg {avgTopicsTouched.toFixed(1)} topics per student
-                {totalInteractions > gradedTotal
-                  ? ` (${totalInteractions - gradedTotal} more still awaiting a reply, excluded from the rates below)`
-                  : ""}
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
