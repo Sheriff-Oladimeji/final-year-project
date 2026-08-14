@@ -48,7 +48,6 @@ export function InteractionFilters() {
             <SelectItem value="correct_with_hint">Partially correct</SelectItem>
             <SelectItem value="incorrect">Incorrect</SelectItem>
             <SelectItem value="give_up">Gave up</SelectItem>
-            <SelectItem value="unscored">Unscored</SelectItem>
           </SelectContent>
         </Select>
       </div>

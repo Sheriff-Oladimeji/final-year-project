@@ -34,6 +34,11 @@ export default async function AdminInteractionsPage({ searchParams }: PageProps)
   });
 
   const interactions = rawInteractions.filter((i) => {
+    // "unscored" (still awaiting a reply) and "completed" (a wrap-up
+    // message with no possible correctness) aren't outcomes — always
+    // excluded here, not just when a correctness filter is applied, to
+    // match the Insights page's correctness distribution.
+    if (i.correctness === "unscored" || i.correctness === "completed") return false;
     if (params.correctness && i.correctness !== params.correctness) return false;
     if (params.template && i.promptTemplate !== params.template) return false;
     return true;
