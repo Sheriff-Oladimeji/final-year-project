@@ -22,6 +22,13 @@ const CORRECTNESS_LABELS: Record<string, string> = {
 
 const CORRECTNESS_ORDER = ["correct", "correct_with_hint", "incorrect", "give_up", "unscored"];
 
+// "unscored" (awaiting a reply) and "completed" (a wrap-up message with no
+// possible correctness) aren't outcomes — they're rows that were never
+// eligible to be graded. Percentages are computed only across these four,
+// so they sum to 100% among themselves instead of being diluted by rows
+// that can't be correct or incorrect in the first place.
+const GRADED_LABELS = ["correct", "correct_with_hint", "incorrect", "give_up"];
+
 const CORRECTNESS_COLOR: Record<string, string> = {
   correct: "bg-green-500",
   correct_with_hint: "bg-amber-500",
@@ -42,6 +49,7 @@ export default async function AdminInsightsPage() {
       cohortCorrectness[label] = (cohortCorrectness[label] ?? 0) + n;
     }
   }
+  const gradedTotal = GRADED_LABELS.reduce((sum, label) => sum + (cohortCorrectness[label] ?? 0), 0);
 
   const avgSessionsPerStudent = activeStudents > 0
     ? students.reduce((sum, s) => sum + s.sessionCount, 0) / activeStudents
@@ -99,12 +107,17 @@ export default async function AdminInsightsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium">Correctness distribution</CardTitle>
-              <p className="text-xs text-muted-foreground">{totalInteractions} total interactions, avg {avgTopicsTouched.toFixed(1)} topics per student</p>
+              <p className="text-xs text-muted-foreground">
+                {gradedTotal} graded interactions, avg {avgTopicsTouched.toFixed(1)} topics per student
+                {totalInteractions > gradedTotal
+                  ? ` (${totalInteractions - gradedTotal} more still awaiting a reply, excluded from the rates below)`
+                  : ""}
+              </p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {CORRECTNESS_ORDER.filter((label) => cohortCorrectness[label] > 0).map((label) => {
+              {GRADED_LABELS.filter((label) => cohortCorrectness[label] > 0).map((label) => {
                 const n = cohortCorrectness[label] ?? 0;
-                const pct = totalInteractions > 0 ? (n / totalInteractions) * 100 : 0;
+                const pct = gradedTotal > 0 ? (n / gradedTotal) * 100 : 0;
                 return (
                   <div key={label} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
