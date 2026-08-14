@@ -1,7 +1,12 @@
-import { eq, and, or, desc, isNull, lt } from "drizzle-orm";
+import { eq, and, or, desc, isNull, lt, count } from "drizzle-orm";
 import { db } from "@/db";
 import { notebooks } from "@/db/schema";
 import type { Notebook } from "@/db/schema";
+
+export async function countAllNotebooks(): Promise<number> {
+  const rows = await db.select({ n: count() }).from(notebooks);
+  return rows[0]?.n ?? 0;
+}
 
 export async function createNotebook(data: {
   userId: string;

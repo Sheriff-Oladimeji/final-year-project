@@ -1,13 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Users, Zap, FileText, MessageSquare, BarChart3, ListFilter, ArrowRight } from "lucide-react";
+import { Users, BookOpen, FileText, MessageSquare, BarChart3, ListFilter, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CORRECTNESS_LABELS } from "@/lib/mastery";
 import { countStudents } from "@/db/queries/users";
+import { countAllNotebooks } from "@/db/queries/notebooks";
 import { countAllMaterials } from "@/db/queries/materials";
-import { countAllInteractions, countActiveStudentsSince, listInteractionsAdmin } from "@/db/queries/interactions";
+import { countAllInteractions, listInteractionsAdmin } from "@/db/queries/interactions";
 import { cn } from "@/lib/utils";
 
 const CORRECTNESS_STYLES: Record<string, string> = {
@@ -29,11 +30,9 @@ function timeAgo(date: Date): string {
 }
 
 export default async function AdminOverviewPage() {
-  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-  const [students, activeToday, materials, interactions, recentRaw] = await Promise.all([
+  const [students, notebooks, materials, interactions, recentRaw] = await Promise.all([
     countStudents(),
-    countActiveStudentsSince(last24h),
+    countAllNotebooks(),
     countAllMaterials(),
     countAllInteractions(),
     // Over-fetch and filter client-side rather than adding a query-level
@@ -47,7 +46,7 @@ export default async function AdminOverviewPage() {
 
   const stats = [
     { label: "Students", value: students, icon: Users, href: "/admin/users" },
-    { label: "Active (24h)", value: activeToday, icon: Zap, href: "/admin/interactions" },
+    { label: "Notebooks", value: notebooks, icon: BookOpen, href: null },
     { label: "Materials indexed", value: materials, icon: FileText, href: null },
     { label: "Interactions logged", value: interactions, icon: MessageSquare, href: "/admin/interactions" },
   ];
