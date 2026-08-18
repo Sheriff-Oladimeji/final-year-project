@@ -116,7 +116,14 @@ export function SessionInfoSidebar({
     <>
       <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-border bg-card p-4">
         <div className="flex items-center justify-between shrink-0">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Topics</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Topics</p>
+            {topics.length > 0 && (
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {topics.filter((t) => t.has_interacted).length}/{topics.length}
+              </span>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon-sm"

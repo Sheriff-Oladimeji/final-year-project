@@ -183,7 +183,7 @@ export function AddMaterialDialog({
         <DialogHeader>
           <DialogTitle>Add new source</DialogTitle>
           <DialogDescription>
-            Upload a document or add a YouTube video. Gemini will index it for your notebook.
+            Upload a document or add a YouTube video. Gemini indexes it for your notebook.
           </DialogDescription>
         </DialogHeader>
 
