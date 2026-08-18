@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, ChevronDown, HelpCircle, X } from "lucide-react";
+import { AlertCircle, Eye, HelpCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,16 +49,16 @@ const TIER_BAR_CLASS: Record<Tier, string> = {
 
 const NOT_STARTED_BAR_CLASS = "[&>[data-slot=progress-indicator]]:bg-muted-foreground/25";
 
-const TIER_LABEL: Record<Tier, string> = {
-  recall: "Recall",
-  application: "Application",
-  analysis: "Analysis",
-};
-
 const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }> = {
   correct: { className: "bg-emerald-500", title: "Correct" },
   correct_with_hint: { className: "bg-amber-500", title: "Partially correct" },
   incorrect: { className: "bg-red-500", title: "Incorrect" },
+};
+
+const TIER_LABEL: Record<Tier, string> = {
+  recall: "Recall",
+  application: "Application",
+  analysis: "Analysis",
 };
 
 function TopicRow({
@@ -70,12 +70,7 @@ function TopicRow({
   isCurrent: boolean;
   onAction?: (topic: NotebookTopicStatus) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const barClass = topic.has_interacted ? TIER_BAR_CLASS[topic.tier] : NOT_STARTED_BAR_CLASS;
-  // The bar itself still carries no label by default — that decision holds.
-  // The chevron is opt-in: collapsed, the row looks exactly as before;
-  // expanded, it names the tier and score for a topic that's actually been
-  // interacted with. A topic with no interaction yet has nothing to reveal.
   return (
     <div
       className={cn(
@@ -84,19 +79,7 @@ function TopicRow({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 min-w-0">
-          {topic.has_interacted && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-label={expanded ? "Hide mastery detail" : "Show mastery detail"}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <ChevronDown className={cn("size-3 transition-transform", expanded && "rotate-180")} />
-            </button>
-          )}
-          <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
-        </div>
+        <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
         {onAction && (
           <button
             type="button"
@@ -107,20 +90,66 @@ function TopicRow({
           </button>
         )}
       </div>
-      {/* No number rendered here by default — the bar's fill and color are
-          the only signal at rest, deliberately not paired with a digit, a
-          text badge, or a title tooltip. The chevron above reveals both on
-          demand instead of showing them unconditionally. */}
+      {/* No number rendered anywhere in this row — the bar's fill and color
+          are the only signal, deliberately not paired with a digit, a text
+          badge, or a title tooltip. Full detail lives in the Mastery
+          Progress dialog instead, where there's room for it. */}
       <Progress
         value={topic.has_interacted ? topic.mastery_score : 0}
         className={cn("mt-2 h-1.5", barClass)}
       />
-      {expanded && topic.has_interacted && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
-          {TIER_LABEL[topic.tier]} tier · {topic.mastery_score}/100
-        </p>
-      )}
     </div>
+  );
+}
+
+// Full-width dashboard view of every topic's tier and score — the sidebar
+// panel is deliberately narrow and label-free (see TopicRow above); this is
+// the wide, detailed counterpart for when someone actually wants to read
+// exact numbers across every topic in the notebook at once.
+function MasteryProgressDialog({
+  open,
+  onOpenChange,
+  topics,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  topics: NotebookTopicStatus[];
+}) {
+  const interactedCount = topics.filter((t) => t.has_interacted).length;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Mastery progress</DialogTitle>
+          <DialogDescription>
+            {interactedCount} of {topics.length} topics interacted with.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+          <div className="flex flex-col gap-2">
+            {topics.map((t) => {
+              const barClass = t.has_interacted ? TIER_BAR_CLASS[t.tier] : NOT_STARTED_BAR_CLASS;
+              return (
+                <div key={t.id} className="rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium capitalize truncate">{t.name}</p>
+                    <p className="shrink-0 text-xs text-muted-foreground">
+                      {t.has_interacted
+                        ? `${TIER_LABEL[t.tier]} tier · ${t.mastery_score}/100`
+                        : "Not started"}
+                    </p>
+                  </div>
+                  <Progress
+                    value={t.has_interacted ? t.mastery_score : 0}
+                    className={cn("mt-2 h-1.5", barClass)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -136,6 +165,7 @@ export function SessionInfoSidebar({
   onMobileClose,
 }: SessionInfoSidebarProps) {
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [masteryProgressOpen, setMasteryProgressOpen] = useState(false);
 
   // Topics is the primary panel and claims all available height (flex-1) so
   // the list doesn't shrink-wrap to a handful of rows and leave dead space
@@ -153,20 +183,36 @@ export function SessionInfoSidebar({
               </span>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="size-5 -mr-1 text-muted-foreground hover:text-foreground"
-            onClick={() => setHowItWorksOpen(true)}
-            title="How this works"
-          >
-            <HelpCircle className="size-3.5" />
-          </Button>
+          <div className="flex items-center gap-0.5 -mr-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-5 text-muted-foreground hover:text-foreground"
+              onClick={() => setMasteryProgressOpen(true)}
+              title="Mastery progress"
+            >
+              <Eye className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-5 text-muted-foreground hover:text-foreground"
+              onClick={() => setHowItWorksOpen(true)}
+              title="How this works"
+            >
+              <HelpCircle className="size-3.5" />
+            </Button>
+          </div>
         </div>
         {topics.length > 0 ? (
           <div className="mt-3 flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto">
             {topics.map((t) => (
-              <TopicRow key={t.id} topic={t} isCurrent={t.name === currentTopicName} onAction={onTopicAction} />
+              <TopicRow
+                key={t.id}
+                topic={t}
+                isCurrent={t.name === currentTopicName}
+                onAction={onTopicAction}
+              />
             ))}
           </div>
         ) : topicsExtracting ? (
@@ -228,6 +274,12 @@ export function SessionInfoSidebar({
           </DialogHeader>
         </DialogContent>
       </Dialog>
+
+      <MasteryProgressDialog
+        open={masteryProgressOpen}
+        onOpenChange={setMasteryProgressOpen}
+        topics={topics}
+      />
 
       {/* Mobile overlay drawer */}
       {mobileOpen && (
