@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, HelpCircle, X } from "lucide-react";
+import { AlertCircle, ChevronDown, HelpCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,6 +49,12 @@ const TIER_BAR_CLASS: Record<Tier, string> = {
 
 const NOT_STARTED_BAR_CLASS = "[&>[data-slot=progress-indicator]]:bg-muted-foreground/25";
 
+const TIER_LABEL: Record<Tier, string> = {
+  recall: "Recall",
+  application: "Application",
+  analysis: "Analysis",
+};
+
 const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }> = {
   correct: { className: "bg-emerald-500", title: "Correct" },
   correct_with_hint: { className: "bg-amber-500", title: "Partially correct" },
@@ -64,7 +70,12 @@ function TopicRow({
   isCurrent: boolean;
   onAction?: (topic: NotebookTopicStatus) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const barClass = topic.has_interacted ? TIER_BAR_CLASS[topic.tier] : NOT_STARTED_BAR_CLASS;
+  // The bar itself still carries no label by default — that decision holds.
+  // The chevron is opt-in: collapsed, the row looks exactly as before;
+  // expanded, it names the tier and score for a topic that's actually been
+  // interacted with. A topic with no interaction yet has nothing to reveal.
   return (
     <div
       className={cn(
@@ -73,7 +84,19 @@ function TopicRow({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
+        <div className="flex items-center gap-1 min-w-0">
+          {topic.has_interacted && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-label={expanded ? "Hide mastery detail" : "Show mastery detail"}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <ChevronDown className={cn("size-3 transition-transform", expanded && "rotate-180")} />
+            </button>
+          )}
+          <p className="text-xs font-medium capitalize truncate">{topic.name}</p>
+        </div>
         {onAction && (
           <button
             type="button"
@@ -84,13 +107,19 @@ function TopicRow({
           </button>
         )}
       </div>
-      {/* No number rendered anywhere in this row — the bar's fill and color
-          are the only signal, deliberately not paired with a digit, a text
-          badge, or a title tooltip. */}
+      {/* No number rendered here by default — the bar's fill and color are
+          the only signal at rest, deliberately not paired with a digit, a
+          text badge, or a title tooltip. The chevron above reveals both on
+          demand instead of showing them unconditionally. */}
       <Progress
         value={topic.has_interacted ? topic.mastery_score : 0}
         className={cn("mt-2 h-1.5", barClass)}
       />
+      {expanded && topic.has_interacted && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          {TIER_LABEL[topic.tier]} tier · {topic.mastery_score}/100
+        </p>
+      )}
     </div>
   );
 }
