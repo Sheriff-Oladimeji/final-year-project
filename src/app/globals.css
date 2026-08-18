@@ -176,3 +176,13 @@
   0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
   30%            { transform: translateY(-6px); opacity: 1;    }
 }
+
+/* Indeterminate sweep for the upload progress bar — there's no real
+   byte-level progress from the server action, only a file-count for
+   multi-file batches, so a single-file upload (the common case) has
+   nothing determinate to show. A sweeping bar reads as "working" without
+   claiming a percentage we don't actually have. */
+@keyframes upload-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}

@@ -231,6 +231,23 @@ export function AddMaterialDialog({
                       ? `Uploading ${Math.min(uploadProgress.done + 1, uploadProgress.total)} of ${uploadProgress.total}…`
                       : "Uploading…"}
                   </span>
+                  {/* Determinate for multi-file batches (a real done/total
+                      ratio); a sweeping bar otherwise — the server action
+                      doesn't report byte-level progress within one file, so
+                      a fixed percentage there would be a guess, not a fact. */}
+                  <div className="w-2/3 h-1 rounded-full bg-border overflow-hidden">
+                    {uploadProgress && uploadProgress.total > 1 ? (
+                      <div
+                        className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                        style={{ width: `${(uploadProgress.done / uploadProgress.total) * 100}%` }}
+                      />
+                    ) : (
+                      <div
+                        className="h-full w-1/3 rounded-full bg-primary"
+                        style={{ animation: "upload-sweep 1.1s ease-in-out infinite" }}
+                      />
+                    )}
+                  </div>
                 </>
               ) : (
                 <>

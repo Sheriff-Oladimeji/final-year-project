@@ -18,6 +18,7 @@ export default async function AdminUsersPage() {
 
   const users: UserAdmin[] = rawUsers.map((u) => ({
     id: u.id,
+    name: u.name,
     email: u.email,
     created_at: u.createdAt.toISOString(),
     banned: u.banned,
@@ -42,7 +43,7 @@ export default async function AdminUsersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Email</TableHead>
+                <TableHead>User</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-0" />
@@ -51,7 +52,10 @@ export default async function AdminUsersPage() {
             <TableBody>
               {users.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium text-sm">{user.email}</TableCell>
+                  <TableCell>
+                    <p className="font-medium text-sm">{user.name}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(user.created_at).toLocaleDateString()}
                   </TableCell>
