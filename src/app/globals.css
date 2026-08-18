@@ -127,6 +127,16 @@
   html {
     @apply font-sans;
   }
+  /* Browsers default <button> to cursor: default, unlike <a> — every
+     button in this app is clickable, so the pointer cursor should say so. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* Scrollbar: track blends into the surface behind it, thumb stays visible. */

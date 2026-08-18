@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Eye, HelpCircle, X } from "lucide-react";
+import { AlertCircle, HelpCircle, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,12 +53,6 @@ const CORRECTNESS_DOT: Record<Correctness, { className: string; title: string }>
   correct: { className: "bg-emerald-500", title: "Correct" },
   correct_with_hint: { className: "bg-amber-500", title: "Partially correct" },
   incorrect: { className: "bg-red-500", title: "Incorrect" },
-};
-
-const TIER_LABEL: Record<Tier, string> = {
-  recall: "Recall",
-  application: "Application",
-  analysis: "Analysis",
 };
 
 function TopicRow({
@@ -124,10 +118,12 @@ function StatTile({ label, value, accentClass }: { label: string; value: React.R
 function MasteryProgressDialog({
   open,
   onOpenChange,
+  notebookTitle,
   topics,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  notebookTitle: string;
   topics: NotebookTopicStatus[];
 }) {
   const interacted = topics.filter((t) => t.has_interacted);
@@ -136,14 +132,20 @@ function MasteryProgressDialog({
     : 0;
   const tierCounts: Record<Tier, number> = { recall: 0, application: 0, analysis: 0 };
   for (const t of interacted) tierCounts[t.tier]++;
+  // Interacted topics first — the whole point of this dialog is to review
+  // progress, and a dense grid scans much better with "here's what's been
+  // done" up top rather than interleaved with untouched topics.
+  const sortedTopics = [...topics].sort(
+    (a, b) => Number(b.has_interacted) - Number(a.has_interacted),
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[88vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Mastery progress</DialogTitle>
-          <DialogDescription>
-            {interacted.length} of {topics.length} topics interacted with.
+          <DialogTitle className="capitalize">{notebookTitle} · Mastery progress</DialogTitle>
+          <DialogDescription className="sr-only">
+            Mastery progress across every topic in {notebookTitle}.
           </DialogDescription>
         </DialogHeader>
 
@@ -168,7 +170,7 @@ function MasteryProgressDialog({
 
         <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {topics.map((t) => {
+            {sortedTopics.map((t) => {
               const barClass = t.has_interacted ? TIER_BAR_CLASS[t.tier] : NOT_STARTED_BAR_CLASS;
               return (
                 <div key={t.id} className="rounded-lg border border-border p-3">
@@ -178,15 +180,14 @@ function MasteryProgressDialog({
                     )}
                     <p className="text-sm font-medium capitalize truncate flex-1">{t.name}</p>
                   </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-3">
-                    <Progress
-                      value={t.has_interacted ? t.mastery_score : 0}
-                      className={cn("h-1.5 flex-1", barClass)}
-                    />
-                    <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                      {t.has_interacted ? `${TIER_LABEL[t.tier]} · ${t.mastery_score}/100` : "Not started"}
-                    </p>
-                  </div>
+                  {/* No per-row tier/score text — the live session can show
+                      an in-progress display value that doesn't match the
+                      persisted score, so a number here risks being wrong in
+                      a way the bar's color alone isn't. */}
+                  <Progress
+                    value={t.has_interacted ? t.mastery_score : 0}
+                    className={cn("mt-1.5 h-1.5", barClass)}
+                  />
                 </div>
               );
             })}
@@ -235,7 +236,7 @@ export function SessionInfoSidebar({
               onClick={() => setMasteryProgressOpen(true)}
               title="Mastery progress"
             >
-              <Eye className="size-3.5" />
+              <Maximize2 className="size-3.5" />
             </Button>
             <Button
               variant="ghost"
@@ -322,6 +323,7 @@ export function SessionInfoSidebar({
       <MasteryProgressDialog
         open={masteryProgressOpen}
         onOpenChange={setMasteryProgressOpen}
+        notebookTitle={notebookTitle}
         topics={topics}
       />
 
