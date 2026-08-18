@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Ban, CheckCircle, Trash2 } from "lucide-react";
+import { Loader2, Ban, CheckCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,8 +11,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { disableUserAction, enableUserAction, deleteUserAction } from "@/actions/admin";
 import type { UserAdmin } from "@/types";
 
@@ -54,31 +59,32 @@ export function UserActions({ user }: UserActionsProps) {
   const isBanned = user.banned;
 
   return (
-    <div className="flex items-center gap-1.5">
-      <Button
-        variant="outline"
-        size="xs"
-        disabled={busy}
-        onClick={handleToggle}
-        title={isBanned ? "Re-enable account" : "Disable account"}
-        className={isBanned ? "text-green-700 border-green-200 hover:bg-green-50" : ""}
-      >
-        {busy ? (
-          <Loader2 className="size-3 animate-spin" />
-        ) : isBanned ? (
-          <CheckCircle className="size-3" />
-        ) : (
-          <Ban className="size-3" />
-        )}
-        {isBanned ? "Re-enable" : "Disable"}
-      </Button>
+    <div className="flex items-center">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon-xs" disabled={busy} className="text-muted-foreground hover:text-foreground">
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <MoreHorizontal className="size-3.5" />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={handleToggle}
+            className={isBanned ? "text-green-700 focus:text-green-700" : ""}
+          >
+            {isBanned ? <CheckCircle className="size-3.5" /> : <Ban className="size-3.5" />}
+            {isBanned ? "Re-enable account" : "Disable account"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="size-3.5" />
+            Delete permanently
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogTrigger asChild>
-          <Button variant="ghost" size="icon-xs" className="text-muted-foreground hover:text-destructive">
-            <Trash2 className="size-3.5" />
-          </Button>
-        </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete user?</DialogTitle>

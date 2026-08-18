@@ -29,9 +29,6 @@ export default async function AdminUsersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold">Users</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {users.length} account{users.length !== 1 ? "s" : ""} registered
-        </p>
       </div>
 
       {users.length === 0 ? (
@@ -46,7 +43,7 @@ export default async function AdminUsersPage() {
                 <TableHead>User</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-0" />
+                <TableHead className="w-0">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
