@@ -106,6 +106,21 @@ function TopicRow({
 // panel is deliberately narrow and label-free (see TopicRow above); this is
 // the wide, detailed counterpart for when someone actually wants to read
 // exact numbers across every topic in the notebook at once.
+const TIER_DOT_CLASS: Record<Tier, string> = {
+  recall: "bg-primary",
+  application: "bg-amber-500",
+  analysis: "bg-emerald-500",
+};
+
+function StatTile({ label, value, accentClass }: { label: string; value: React.ReactNode; accentClass?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn("mt-0.5 text-xl font-semibold tabular-nums", accentClass)}>{value}</p>
+    </div>
+  );
+}
+
 function MasteryProgressDialog({
   open,
   onOpenChange,
@@ -115,34 +130,63 @@ function MasteryProgressDialog({
   onOpenChange: (open: boolean) => void;
   topics: NotebookTopicStatus[];
 }) {
-  const interactedCount = topics.filter((t) => t.has_interacted).length;
+  const interacted = topics.filter((t) => t.has_interacted);
+  const avgScore = interacted.length > 0
+    ? Math.round(interacted.reduce((sum, t) => sum + t.mastery_score, 0) / interacted.length)
+    : 0;
+  const tierCounts: Record<Tier, number> = { recall: 0, application: 0, analysis: 0 };
+  for (const t of interacted) tierCounts[t.tier]++;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-4xl max-h-[88vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Mastery progress</DialogTitle>
           <DialogDescription>
-            {interactedCount} of {topics.length} topics interacted with.
+            {interacted.length} of {topics.length} topics interacted with.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
+          <StatTile label="Interacted" value={`${interacted.length}/${topics.length}`} />
+          <StatTile label="Avg score" value={`${avgScore}/100`} />
+          <StatTile
+            label="By tier"
+            value={
+              <span className="flex items-center gap-2.5 text-sm font-medium">
+                {(["recall", "application", "analysis"] as const).map((tier) => (
+                  <span key={tier} className="flex items-center gap-1">
+                    <span className={cn("size-2 rounded-full", TIER_DOT_CLASS[tier])} />
+                    {tierCounts[tier]}
+                  </span>
+                ))}
+              </span>
+            }
+          />
+          <StatTile label="Not started" value={topics.length - interacted.length} />
+        </div>
+
         <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
-          <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {topics.map((t) => {
               const barClass = t.has_interacted ? TIER_BAR_CLASS[t.tier] : NOT_STARTED_BAR_CLASS;
               return (
                 <div key={t.id} className="rounded-lg border border-border p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium capitalize truncate">{t.name}</p>
-                    <p className="shrink-0 text-xs text-muted-foreground">
-                      {t.has_interacted
-                        ? `${TIER_LABEL[t.tier]} tier · ${t.mastery_score}/100`
-                        : "Not started"}
+                  <div className="flex items-center gap-2">
+                    {t.has_interacted && (
+                      <span className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT_CLASS[t.tier])} />
+                    )}
+                    <p className="text-sm font-medium capitalize truncate flex-1">{t.name}</p>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                    <Progress
+                      value={t.has_interacted ? t.mastery_score : 0}
+                      className={cn("h-1.5 flex-1", barClass)}
+                    />
+                    <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                      {t.has_interacted ? `${TIER_LABEL[t.tier]} · ${t.mastery_score}/100` : "Not started"}
                     </p>
                   </div>
-                  <Progress
-                    value={t.has_interacted ? t.mastery_score : 0}
-                    className={cn("mt-2 h-1.5", barClass)}
-                  />
                 </div>
               );
             })}
