@@ -129,6 +129,22 @@ export async function findNextUninteractedTopic(
   return rows[0] ?? null;
 }
 
+// Unconditional wipe of every topic in a notebook, interacted or not.
+// Topics have no material-level link (only notebook-level), so there's no
+// way to remove just the labels a specific deleted material contributed —
+// this clears the whole taxonomy so it can be re-extracted fresh from
+// whatever materials remain. Deletes interactions first since
+// interactions.topicId has no onDelete cascade and would otherwise block
+// the topic delete with a foreign key violation.
+export async function deleteAllTopicsForNotebook(userId: string, notebookId: string): Promise<void> {
+  await db
+    .delete(interactions)
+    .where(and(eq(interactions.userId, userId), eq(interactions.notebookId, notebookId)));
+  await db
+    .delete(topics)
+    .where(and(eq(topics.userId, userId), eq(topics.notebookId, notebookId)));
+}
+
 export async function updateMasteryScore(topicId: string, newScore: number): Promise<Topic> {
   const rows = await db
     .update(topics)

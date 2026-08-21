@@ -138,6 +138,16 @@ export async function releaseTopicsExtractionSlot(
     .where(and(eq(notebooks.id, id), eq(notebooks.userId, userId)));
 }
 
+// Clears the "already extracted" stamp so the next upload's skip-check in
+// regenerateTopicTaxonomy doesn't treat stale content as already covered
+// after deleteAllTopicsForNotebook has wiped the topics themselves.
+export async function resetNotebookTopicsExtraction(id: string, userId: string): Promise<void> {
+  await db
+    .update(notebooks)
+    .set({ topicsExtractedAt: null })
+    .where(and(eq(notebooks.id, id), eq(notebooks.userId, userId)));
+}
+
 export async function touchNotebook(id: string, userId: string): Promise<void> {
   await db
     .update(notebooks)

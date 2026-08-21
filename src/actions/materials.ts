@@ -14,7 +14,8 @@ import {
   listMaterialsByNotebook,
   MATERIALS_PER_NOTEBOOK_CAP,
 } from "@/db/queries/materials";
-import { getNotebook, touchNotebook, setNotebookSummary, claimNotebookSummarySlot } from "@/db/queries/notebooks";
+import { getNotebook, touchNotebook, setNotebookSummary, claimNotebookSummarySlot, resetNotebookTopicsExtraction } from "@/db/queries/notebooks";
+import { deleteAllTopicsForNotebook } from "@/db/queries/topics";
 import { fetchTranscript } from "@/lib/youtube";
 import { uploadDocumentToStore, deleteDocumentFromStore } from "@/lib/gemini/fileSearch";
 import { generateMaterialSuggestions, generateNotebookSummary } from "@/lib/ai/suggestions";
@@ -232,6 +233,8 @@ export async function deleteMaterialAction(materialId: string) {
   }
 
   await deleteMaterial(materialId, session.user.id);
+  await deleteAllTopicsForNotebook(session.user.id, material.notebookId);
+  await resetNotebookTopicsExtraction(material.notebookId, session.user.id);
   revalidatePath(`/notebooks/${material.notebookId}`);
   return { data: { success: true, notebookId: material.notebookId } };
 }
